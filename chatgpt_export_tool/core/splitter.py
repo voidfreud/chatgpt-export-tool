@@ -148,7 +148,9 @@ class SplitProcessor:
 
         elif self.mode == SplitMode.ID:
             # Group by conversation ID
-            conv_id = conv.get("id", conv.get("_id"))
+            # conversation_id is the primary UUID used for API calls and sharing
+            # id is a fallback, _id is the MongoDB ObjectId (least preferred)
+            conv_id = conv.get("conversation_id", conv.get("id", conv.get("_id")))
             if conv_id is not None:
                 return str(conv_id)
             logger.warning("Conversation has no ID field, using 'unknown_id'")
