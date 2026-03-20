@@ -7,7 +7,6 @@ Provides text, JSON, and future CSV formatting support.
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from chatgpt_export_tool.core.field_config import FieldSelector
@@ -17,58 +16,24 @@ from chatgpt_export_tool.core.utils import format_timestamp, get_logger
 logger = get_logger()
 
 
-class VerbosityLevel(Enum):
-    """Verbosity levels for analyze output.
-
-    Attributes:
-        MINIMAL: Only threads count + message count (default).
-        FULL: Above + field coverage info.
-    """
-
-    MINIMAL = "minimal"
-    FULL = "full"
-
-
 @dataclass
 class AnalyzeConfig:
-    """Configuration for analyze output verbosity.
+    """Configuration for analyze output.
 
     Attributes:
-        verbosity: Level of detail in the output (default: MINIMAL).
-        show_structure: Whether to show sample structure tree.
-            Inferred from verbosity if not explicitly set.
-        show_fields: Whether to show field coverage info.
-            Inferred from verbosity if not explicitly set.
+        include_fields: Whether to include field coverage info (default: False).
 
     Example:
         >>> config = AnalyzeConfig()  # minimal by default
-        >>> config = AnalyzeConfig(verbosity=VerbosityLevel.FIELDS)
-        >>> config = AnalyzeConfig(verbosity=VerbosityLevel.VERBOSE, show_fields=False)
+        >>> config = AnalyzeConfig(include_fields=True)
     """
 
-    verbosity: VerbosityLevel = VerbosityLevel.MINIMAL
-    show_structure: Optional[bool] = None
-    show_fields: Optional[bool] = None
-
-    def __post_init__(self):
-        """Infer show_structure and show_fields from verbosity if not explicitly set."""
-        logger.debug(f"AnalyzeConfig initialized with verbosity={self.verbosity.value}")
-        if self.show_structure is None:
-            self.show_structure = False
-            logger.debug(f"show_structure set to False (structure not used)")
-        if self.show_fields is None:
-            self.show_fields = self.verbosity == VerbosityLevel.FULL
-            logger.debug(f"show_fields inferred as {self.show_fields}")
+    include_fields: bool = False
 
     @property
     def include_structure(self) -> bool:
         """Whether to include sample structure in output."""
-        return bool(self.show_structure)
-
-    @property
-    def include_fields(self) -> bool:
-        """Whether to include field coverage info in output."""
-        return bool(self.show_fields)
+        return False  # Structure not used in current implementation
 
 
 class BaseFormatter(ABC):
@@ -160,7 +125,7 @@ class TextFormatter(BaseFormatter):
 
         logger.debug(
             f"_format_analysis: formatting {results['conversation_count']} conversations, "
-            f"{results['message_count']} messages, verbosity={config.verbosity.value}, "
+            f"{results['message_count']} messages, "
             f"include_fields={config.include_fields}, include_structure={config.include_structure}"
         )
 

@@ -13,11 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Import from the new package structure
 from chatgpt_export_tool.cli import create_parser, main
 from chatgpt_export_tool.core.field_config import FieldSelector
-from chatgpt_export_tool.core.formatters import (
-    AnalyzeConfig,
-    TextFormatter,
-    VerbosityLevel,
-)
+from chatgpt_export_tool.core.formatters import AnalyzeConfig, TextFormatter
 from chatgpt_export_tool.core.parser import JSONParser, format_size, get_file_size
 
 
@@ -172,9 +168,9 @@ class TestCLIArguments:
         """Test that multiple arguments work together."""
         parser = create_parser()
         args = parser.parse_args(
-            ["analyze", "--verbosity", "full", "--output", "out.txt", "input.json"]
+            ["analyze", "--fields", "--output", "out.txt", "input.json"]
         )
-        assert args.verbosity == VerbosityLevel.FULL
+        assert args.include_fields is True
         assert args.output == "out.txt"
         assert args.file == "input.json"
 
@@ -202,58 +198,32 @@ class TestMainFunction:
             assert exc_info.value.code == 0
 
 
-class TestVerbosityLevel:
-    """Test the VerbosityLevel enum."""
-
-    def test_verbosity_minimal(self):
-        """Test MINIMAL verbosity level."""
-        assert VerbosityLevel.MINIMAL.value == "minimal"
-
-    def test_verbosity_full(self):
-        """Test FULL verbosity level."""
-        assert VerbosityLevel.FULL.value == "full"
-
-
 class TestAnalyzeConfig:
     """Test the AnalyzeConfig dataclass."""
 
-    def test_default_verbosity_is_minimal(self):
-        """Test that default verbosity is MINIMAL."""
+    def test_default_include_fields_is_false(self):
+        """Test that default include_fields is False."""
         config = AnalyzeConfig()
-        assert config.verbosity == VerbosityLevel.MINIMAL
+        assert config.include_fields is False
 
-    def test_minimal_includes_nothing(self):
-        """Test that MINIMAL verbosity includes no fields or structure."""
-        config = AnalyzeConfig(verbosity=VerbosityLevel.MINIMAL)
+    def test_include_fields_false_excludes_fields(self):
+        """Test that include_fields=False excludes field info."""
+        config = AnalyzeConfig(include_fields=False)
         assert config.include_fields is False
         assert config.include_structure is False
 
-    def test_full_includes_fields_only(self):
-        """Test that FULL verbosity includes only fields (no structure)."""
-        config = AnalyzeConfig(verbosity=VerbosityLevel.FULL)
+    def test_include_fields_true_includes_fields_only(self):
+        """Test that include_fields=True includes only fields (no structure)."""
+        config = AnalyzeConfig(include_fields=True)
         assert config.include_fields is True
         assert config.include_structure is False
-
-    def test_explicit_show_fields_override(self):
-        """Test that explicit show_fields overrides verbosity inference."""
-        config = AnalyzeConfig(verbosity=VerbosityLevel.MINIMAL, show_fields=True)
-        assert config.include_fields is True
-        # show_structure should still be False from minimal
-        assert config.include_structure is False
-
-    def test_explicit_show_structure_override(self):
-        """Test that explicit show_structure overrides verbosity inference."""
-        config = AnalyzeConfig(verbosity=VerbosityLevel.MINIMAL, show_structure=True)
-        # show_fields should still be False from minimal
-        assert config.include_fields is False
-        assert config.include_structure is True
 
 
 class TestTextFormatterAnalysis:
-    """Test TextFormatter analysis output with verbosity."""
+    """Test TextFormatter analysis output with include_fields."""
 
-    def test_format_analysis_minimal(self):
-        """Test minimal verbosity output contains only basic info."""
+    def test_format_analysis_without_fields(self):
+        """Test output without --fields contains only basic info."""
         formatter = TextFormatter()
         results = {
             "conversation_count": 10,
@@ -261,7 +231,7 @@ class TestTextFormatterAnalysis:
             "all_fields": {"title", "create_time"},
             "sample_conversation": {"title": "Test"},
         }
-        config = AnalyzeConfig(verbosity=VerbosityLevel.MINIMAL)
+        config = AnalyzeConfig(include_fields=False)
         output = formatter._format_analysis(results, config)
 
         # Should contain basic info
@@ -272,8 +242,8 @@ class TestTextFormatterAnalysis:
         # Should NOT contain sample structure
         assert "SAMPLE STRUCTURE" not in output
 
-    def test_format_analysis_full(self):
-        """Test FULL verbosity output includes field info."""
+    def test_format_analysis_with_fields(self):
+        """Test output with --fields includes field info."""
         formatter = TextFormatter()
         results = {
             "conversation_count": 10,
@@ -281,7 +251,7 @@ class TestTextFormatterAnalysis:
             "all_fields": {"title", "create_time", "mapping"},
             "sample_conversation": {"title": "Test"},
         }
-        config = AnalyzeConfig(verbosity=VerbosityLevel.FULL)
+        config = AnalyzeConfig(include_fields=True)
         output = formatter._format_analysis(results, config)
 
         # Should contain basic info
@@ -292,8 +262,8 @@ class TestTextFormatterAnalysis:
         # Should NOT contain sample structure
         assert "SAMPLE STRUCTURE" not in output
 
-    def test_format_analysis_without_config_defaults_to_minimal(self):
-        """Test that _format_analysis without config defaults to minimal."""
+    def test_format_analysis_without_config_defaults_to_no_fields(self):
+        """Test that _format_analysis without config defaults to no fields."""
         formatter = TextFormatter()
         results = {
             "conversation_count": 10,
@@ -303,40 +273,34 @@ class TestTextFormatterAnalysis:
         }
         output = formatter._format_analysis(results, None)
 
-        # Should NOT contain field info (minimal default)
+        # Should NOT contain field info (default)
         assert "ALL UNIQUE FIELD NAMES" not in output
         # Should NOT contain sample structure
         assert "SAMPLE STRUCTURE" not in output
 
 
-class TestCLIVerbosityArgument:
-    """Test CLI argument parsing for verbosity."""
+class TestCLIFieldsArgument:
+    """Test CLI argument parsing for --fields flag."""
 
-    def test_default_verbosity_minimal(self):
-        """Test that default verbosity is minimal when not specified."""
+    def test_default_include_fields_false(self):
+        """Test that default include_fields is False when not specified."""
         parser = create_parser()
         args = parser.parse_args(["analyze", "data.json"])
-        assert args.verbosity == VerbosityLevel.MINIMAL
+        assert args.include_fields is False
 
-    def test_verbosity_full_flag(self):
-        """Test --verbosity full flag."""
+    def test_fields_flag_enables_include_fields(self):
+        """Test --fields flag enables include_fields."""
         parser = create_parser()
-        args = parser.parse_args(["analyze", "--verbosity", "full", "data.json"])
-        assert args.verbosity == VerbosityLevel.FULL
+        args = parser.parse_args(["analyze", "--fields", "data.json"])
+        assert args.include_fields is True
 
-    def test_verbosity_short_flag(self):
-        """Test -V short flag for verbosity."""
-        parser = create_parser()
-        args = parser.parse_args(["analyze", "-V", "full", "data.json"])
-        assert args.verbosity == VerbosityLevel.FULL
-
-    def test_verbosity_with_other_flags(self):
-        """Test verbosity combined with other flags."""
+    def test_fields_with_other_flags(self):
+        """Test --fields combined with other flags."""
         parser = create_parser()
         args = parser.parse_args(
-            ["analyze", "-V", "full", "--output", "out.txt", "data.json"]
+            ["analyze", "--fields", "--output", "out.txt", "data.json"]
         )
-        assert args.verbosity == VerbosityLevel.FULL
+        assert args.include_fields is True
         assert args.output == "out.txt"
 
 
