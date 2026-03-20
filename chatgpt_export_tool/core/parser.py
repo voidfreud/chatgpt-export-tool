@@ -49,6 +49,8 @@ class JSONParser:
             "message_count": 0,
             "all_fields": set(),
             "sample_conversation": None,
+            "min_date": None,
+            "max_date": None,
         }
 
         with open(self.filepath, "rb") as f:
@@ -58,6 +60,14 @@ class JSONParser:
             for conv in conversations:
                 results["conversation_count"] += 1
                 results["all_fields"].update(conv.keys())
+
+                # Track date range from conversation create_time
+                create_time = conv.get("create_time")
+                if create_time is not None:
+                    if results["min_date"] is None or create_time < results["min_date"]:
+                        results["min_date"] = create_time
+                    if results["max_date"] is None or create_time > results["max_date"]:
+                        results["max_date"] = create_time
 
                 # Count messages in mapping
                 if "mapping" in conv and conv["mapping"]:

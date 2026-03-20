@@ -182,6 +182,8 @@ class TextFormatter(BaseFormatter):
             f"Number of threads/conversations: {results['conversation_count']:,}"
         )
         lines.append(f"Total message nodes in mappings: {results['message_count']:,}")
+        if results.get("min_date") is not None and results.get("max_date") is not None:
+            lines.append(f"Date range: {results['min_date']} to {results['max_date']}")
         lines.append("")
 
         # Show field coverage info if configured
