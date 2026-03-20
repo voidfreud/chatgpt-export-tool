@@ -325,8 +325,8 @@ class TestTextFormatterAnalysis:
         assert "100" in output
         # Should contain field info
         assert "ALL UNIQUE FIELD NAMES" in output
-        # Should contain sample structure
-        assert "SAMPLE STRUCTURE" in output
+        # Should NOT contain sample structure (removed feature)
+        assert "SAMPLE STRUCTURE" not in output
 
     def test_format_analysis_without_config_defaults_to_minimal(self):
         """Test that _format_analysis without config defaults to minimal."""

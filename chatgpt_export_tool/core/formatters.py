@@ -206,14 +206,6 @@ class TextFormatter(BaseFormatter):
                     lines.append(f"  {', '.join(sorted(fields))}")
                     lines.append("")
 
-        # Show sample structure if configured (verbose only)
-        if config.include_structure and results.get("sample_conversation"):
-            lines.append("-" * 60)
-            lines.append("SAMPLE STRUCTURE (first conversation):")
-            lines.append("-" * 60)
-            for key, value in results["sample_conversation"].items():
-                lines.append(f"  {key}: {value}")
-
         output = "\n".join(lines)
         logger.debug(f"_format_analysis: generated output of {len(output)} chars")
         return output
