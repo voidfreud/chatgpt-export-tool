@@ -163,6 +163,11 @@ class OutputWriter:
 
         logger.info(f"Writing {len(groups)} groups to {self.output_dir}")
 
+        # Ensure base output directory exists before writing any files
+        if self._ensure_directory(self.output_dir):
+            result.directories_created += 1
+            logger.debug(f"Created base output directory: {self.output_dir}")
+
         for group_key, conversations in groups.items():
             logger.debug(
                 f"Processing group '{group_key}' with {len(conversations)} conversations"
