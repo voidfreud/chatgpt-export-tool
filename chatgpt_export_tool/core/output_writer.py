@@ -261,7 +261,9 @@ class OutputWriter:
         else:
             content = str(formatted)
 
-        # Write to file
+        # Write to file - ensure parent directory exists right before writing
+        # This is a defensive measure in case _ensure_directory(parent) above didn't succeed
+        filepath.parent.mkdir(parents=True, exist_ok=True)
         with open(filepath, "w", encoding="utf-8") as f:
             bytes_written = f.write(content)
 

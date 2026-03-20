@@ -6,6 +6,7 @@ flexible field selection, metadata filtering, and split options.
 """
 
 import argparse
+from pathlib import Path
 from typing import List, Optional
 
 from chatgpt_export_tool.commands import BaseCommand
@@ -132,6 +133,9 @@ class ExportCommand(BaseCommand):
         output = "\n".join(conversations)
 
         if self.output_file:
+            # Ensure output directory exists before writing
+            output_path = Path(self.output_file)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self.output_file, "w") as f:
                 f.write(output)
             self.logger.info(f"Output written to: {self.output_file}")
