@@ -7,6 +7,7 @@ Provides file validation, logging configuration, and other common utilities.
 import logging
 import os
 import sys
+from datetime import datetime
 from typing import Optional
 
 # Global logger instance - configured in setup_logging()
@@ -122,3 +123,16 @@ def format_size(size_bytes: int) -> str:
             return f"{size:.2f} {unit}"
         size /= 1024.0
     return f"{size:.2f} TB"
+
+
+def format_timestamp(timestamp: float) -> str:
+    """Format a Unix timestamp to human-readable date string.
+
+    Args:
+        timestamp: Unix timestamp (seconds since epoch).
+
+    Returns:
+        Formatted string in "hh:mm dd-mm-yyyy" format.
+    """
+    dt = datetime.fromtimestamp(timestamp)
+    return dt.strftime("%H:%M %d-%m-%Y")

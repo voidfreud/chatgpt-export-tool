@@ -11,7 +11,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from chatgpt_export_tool.core.field_config import FieldSelector
-from chatgpt_export_tool.core.utils import get_logger
+from chatgpt_export_tool.core.utils import format_timestamp, get_logger
 
 # Module-level logger for consistent naming across the codebase
 logger = get_logger()
@@ -183,7 +183,8 @@ class TextFormatter(BaseFormatter):
         )
         lines.append(f"Total message nodes in mappings: {results['message_count']:,}")
         if results.get("min_date") is not None and results.get("max_date") is not None:
-            lines.append(f"Date range: {results['min_date']} to {results['max_date']}")
+            lines.append(f"From: {format_timestamp(results['min_date'])}")
+            lines.append(f"To: {format_timestamp(results['max_date'])}")
         lines.append("")
 
         # Show field coverage info if configured
