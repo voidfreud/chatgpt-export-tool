@@ -32,14 +32,14 @@ dev = [
 ]
 
 [project.scripts]
-analyze-json = "analyze_json:main"
+chatgpt-export = "chatgpt_export_tool.cli:main"
 
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-py-modules = ["analyze_json"]
+packages = ["chatgpt_export_tool", "chatgpt_export_tool.commands", "chatgpt_export_tool.core"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -48,7 +48,7 @@ python_functions = ["test_*"]
 addopts = "-v --tb=short"
 
 [tool.coverage.run]
-source = ["analyze_json"]
+source = ["chatgpt_export_tool"]
 branch = true
 
 [tool.coverage.report]
