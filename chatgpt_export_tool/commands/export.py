@@ -246,10 +246,11 @@ def add_export_parser(subparsers) -> argparse.ArgumentParser:
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Split Modes:
-  single   - All conversations to one file (default, backward compatible)
-  subject  - Each conversation to its own file (named by title)
-  date     - Group conversations by creation date (daily folders)
+    Split Modes:
+      single   - All conversations to one file (default, backward compatible)
+      subject  - Each conversation to its own file (named by title)
+      date     - Group conversations by creation date (daily folders)
+      id       - Group conversations by their ID field
 
 Output Options:
   -o, --output FILE     - Write single file output to FILE (for --split single)
@@ -327,9 +328,9 @@ Examples:
     export_parser.add_argument(
         "--split",
         "-s",
-        choices=["single", "subject", "date"],
+        choices=[mode.value for mode in SplitMode],
         default="single",
-        help="Split mode: 'single' (default), 'subject' (one file per conversation), 'date' (daily folders)",
+        help="Split mode: 'single' (default), 'subject' (one file per conversation), 'date' (daily folders), 'id' (by conversation ID)",
     )
 
     # Output options
