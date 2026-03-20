@@ -11,6 +11,9 @@ import sys
 from chatgpt_export_tool.commands.analyze import add_analyze_parser, analyze_command
 from chatgpt_export_tool.commands.export import add_export_parser, export_command
 
+# Field groups available for --fields option
+FIELD_GROUPS = ["conversation", "message", "metadata", "minimal"]
+
 
 def create_parser() -> argparse.ArgumentParser:
     """Create the CLI argument parser.
@@ -20,21 +23,30 @@ def create_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         prog="chatgpt-export",
-        description="A modular CLI tool for analyzing and exporting ChatGPT conversations.",
+        description=(
+            "Analyze structure and export ChatGPT conversations from JSON export files.\n\n"
+            "Analyzes conversations to show statistics, structure, and field coverage.\n"
+            "Exports conversations to txt or json with flexible field selection."
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+Exit Codes:
+  0   Success
+  1   Error (file not found, invalid arguments, etc.)
+  130 Interrupted by user (Ctrl+C)
+
 Examples:
   chatgpt-export analyze data.json
   chatgpt-export analyze data.json --verbose
-  chatgpt-export analyze data.json --debug
   chatgpt-export analyze data.json --output results.txt
-  chatgpt-export analyze data.json --fields include title,create_time
-  chatgpt-export analyze data.json --fields exclude model_slug,plugin_ids
-  chatgpt-export analyze data.json --fields groups message,minimal
-  
-  chatgpt-export export data.json --format txt --output report.txt
-  chatgpt-export export data.json --format json --output data.json
-  chatgpt-export export data.json --fields include title,message
+
+  chatgpt-export export data.json --format txt --output conversations.txt
+  chatgpt-export export data.json --format json --output conversations.json
+  chatgpt-export export data.json --fields groups minimal
+  chatgpt-export export data.json --fields include title,create_time --output report.txt
+
+Field Groups: conversation, message, metadata, minimal
+See 'chatgpt-export analyze -h' or 'chatgpt-export export -h' for full details.
         """,
     )
 

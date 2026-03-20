@@ -2,6 +2,7 @@
 Analyze command for chatgpt_export_tool.
 
 Analyzes the structure of ChatGPT conversations.json export files.
+Provides statistics, structure overview, and field coverage analysis.
 """
 
 import argparse
@@ -11,6 +12,9 @@ from chatgpt_export_tool.commands import BaseCommand
 from chatgpt_export_tool.core.formatters import TextFormatter
 from chatgpt_export_tool.core.parser import JSONParser
 from chatgpt_export_tool.core.utils import format_size, get_file_size
+
+# Field groups available for --fields groups option
+FIELD_GROUPS = ["conversation", "message", "metadata", "minimal"]
 
 
 class AnalyzeCommand(BaseCommand):
@@ -116,10 +120,34 @@ def add_analyze_parser(subparsers) -> argparse.ArgumentParser:
         Configured argument parser for analyze command.
     """
     analyze_parser = subparsers.add_parser(
-        "analyze", help="Analyze JSON structure and field information"
+        "analyze",
+        help="Show statistics, structure, and field coverage of conversations",
+        description=(
+            "Analyze a ChatGPT conversations.json export file.\n\n"
+            "Shows statistics (conversation count, message count), structure overview,\n"
+            "and field coverage analysis for each conversation level."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Field Groups (for --fields groups):
+  conversation  - _id, conversation_id, create_time, update_time, title, type
+  message       - author, content, status, end_turn
+  metadata      - model_slug, message_type, is_archived
+  minimal       - title, create_time, message (useful for quick overview)
+
+Examples:
+  chatgpt-export analyze data.json
+  chatgpt-export analyze data.json --verbose
+  chatgpt-export analyze data.json --output analysis.txt
+  chatgpt-export analyze data.json --fields groups minimal
+  chatgpt-export analyze data.json --fields include title,create_time
+  chatgpt-export analyze data.json --fields exclude model_slug,plugin_ids
+        """,
     )
 
-    analyze_parser.add_argument("file", help="Path to the JSON file to analyze")
+    analyze_parser.add_argument(
+        "file", help="Path to the conversations.json file to analyze"
+    )
 
     # Create a mutually exclusive group for --fields vs --include/--exclude
     field_group = analyze_parser.add_mutually_exclusive_group()
@@ -128,42 +156,46 @@ def add_analyze_parser(subparsers) -> argparse.ArgumentParser:
         "--fields",
         "-f",
         default="all",
-        help="Field selection mode: all, none, include <fields>, exclude <fields>, groups <groups>",
+        help=(
+            "Field selection: 'all' (default), 'none', "
+            "'include field1,field2', 'exclude field1,field2', "
+            "'groups group1,group2'"
+        ),
     )
 
     field_group.add_argument(
         "--include",
         nargs="+",
         metavar="FIELD",
-        help="Metadata fields to include (use '*' for all, or specific field names)",
+        help="Metadata fields to include (e.g., title create_time model_slug)",
     )
 
     field_group.add_argument(
         "--exclude",
         nargs="+",
         metavar="FIELD",
-        help="Metadata fields to exclude (use '*' for all, or specific field names)",
+        help="Metadata fields to exclude (e.g., model_slug plugin_ids)",
     )
 
     analyze_parser.add_argument(
         "-o",
         "--output",
         metavar="PATH",
-        help="Write output to the specified file instead of stdout",
+        help="Write output to file instead of stdout",
     )
 
     analyze_parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
-        help="Enable verbose output with progress information",
+        help="Show progress information during analysis",
     )
 
     analyze_parser.add_argument(
         "-d",
         "--debug",
         action="store_true",
-        help="Enable debug output with detailed logging",
+        help="Show detailed debug information",
     )
 
     return analyze_parser

@@ -1,7 +1,8 @@
 """
 Export command for chatgpt_export_tool.
 
-Exports ChatGPT conversations to various formats (txt, json).
+Exports ChatGPT conversations to various formats (txt, json) with
+flexible field selection and metadata filtering.
 """
 
 import argparse
@@ -11,6 +12,9 @@ from chatgpt_export_tool.commands import BaseCommand
 from chatgpt_export_tool.core.field_config import FieldSelector, MetadataSelector
 from chatgpt_export_tool.core.formatters import get_formatter
 from chatgpt_export_tool.core.parser import JSONParser
+
+# Field groups available for --fields groups option
+FIELD_GROUPS = ["conversation", "message", "metadata", "minimal"]
 
 
 class ExportCommand(BaseCommand):
@@ -138,17 +142,46 @@ def add_export_parser(subparsers) -> argparse.ArgumentParser:
         Configured argument parser for export command.
     """
     export_parser = subparsers.add_parser(
-        "export", help="Export conversations to various formats"
+        "export",
+        help="Extract conversations with field selection and metadata filtering",
+        description=(
+            "Export ChatGPT conversations to txt or json format.\n\n"
+            "Select which fields to include/exclude using --fields or\n"
+            "filter by metadata using --include/--exclude options."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Field Groups (for --fields groups):
+  conversation  - _id, conversation_id, create_time, update_time, title, type
+  message      - author, content, status, end_turn
+  metadata     - model_slug, message_type, is_archived
+  minimal      - title, create_time, message (useful for quick overview)
+
+Metadata Fields (for --include/--exclude):
+  id, title, create_time, update_time, model_slug, message_type,
+  plugin_ids, conversation_id, type, moderation_results, current_node, is_archived
+
+Examples:
+  chatgpt-export export data.json
+  chatgpt-export export data.json --format txt --output conversations.txt
+  chatgpt-export export data.json --format json --output conversations.json
+  chatgpt-export export data.json --fields groups minimal
+  chatgpt-export export data.json --fields include title,create_time
+  chatgpt-export export data.json --fields exclude model_slug,plugin_ids
+  chatgpt-export export data.json --include title model_slug --output filtered.txt
+        """,
     )
 
-    export_parser.add_argument("file", help="Path to the JSON file to export")
+    export_parser.add_argument(
+        "file", help="Path to the conversations.json file to export"
+    )
 
     export_parser.add_argument(
         "--format",
         "-F",
         choices=["txt", "json"],
         default="txt",
-        help="Output format (default: txt)",
+        help="Output format: 'txt' (default) or 'json'",
     )
 
     # Create a mutually exclusive group for --fields vs --include/--exclude
@@ -158,42 +191,46 @@ def add_export_parser(subparsers) -> argparse.ArgumentParser:
         "--fields",
         "-f",
         default="all",
-        help="Field selection mode: all, none, include <fields>, exclude <fields>, groups <groups>",
+        help=(
+            "Field selection: 'all' (default), 'none', "
+            "'include field1,field2', 'exclude field1,field2', "
+            "'groups group1,group2'"
+        ),
     )
 
     field_group.add_argument(
         "--include",
         nargs="+",
         metavar="FIELD",
-        help="Metadata fields to include (use '*' for all, or specific field names)",
+        help="Export only conversations with these metadata fields",
     )
 
     field_group.add_argument(
         "--exclude",
         nargs="+",
         metavar="FIELD",
-        help="Metadata fields to exclude (use '*' for all, or specific field names)",
+        help="Exclude these metadata fields from export",
     )
 
     export_parser.add_argument(
         "-o",
         "--output",
         metavar="PATH",
-        help="Write output to the specified file instead of stdout",
+        help="Write output to file instead of stdout",
     )
 
     export_parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
-        help="Enable verbose output with progress information",
+        help="Show progress information during export",
     )
 
     export_parser.add_argument(
         "-d",
         "--debug",
         action="store_true",
-        help="Enable debug output with detailed logging",
+        help="Show detailed debug information",
     )
 
     return export_parser
