@@ -93,8 +93,8 @@ class ExportCommand(BaseCommand):
 
         self.logger.info(f"Starting export with split mode: {self.split_mode.value}")
 
-        if self.split_mode == SplitMode.SINGLE and not self.output_dir:
-            # Legacy single-file mode
+        if self.split_mode == SplitMode.SINGLE and self.output_file:
+            # Single file mode when --output is provided
             self._export_single(parser, field_selector, metadata_selector, formatter)
         else:
             # Split mode with directory output
