@@ -337,18 +337,17 @@ def create_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  analyze-json 3ae/conversations.json
-  analyze-json --file data.json --verbose
-  analyze-json --file data.json --output results.txt
-  analyze-json --output results.txt 36f/conversations.json
+  analyze-json data.json
+  analyze-json data.json --verbose
+  analyze-json data.json --output results.txt
+  analyze-json --output results.txt data.json
         """
     )
     
     parser.add_argument(
         'file',
         nargs='?',
-        default='3ae/conversations.json',
-        help="Path to the JSON file to analyze (default: 3ae/conversations.json)"
+        help="Path to the JSON file to analyze"
     )
     
     parser.add_argument(
@@ -380,6 +379,10 @@ def main() -> int:
     """
     parser = create_parser()
     args = parser.parse_args()
+    
+    if args.file is None:
+        print("Please provide a JSON file path", file=sys.stderr)
+        return 1
     
     try:
         print_analysis(args.file, args.output, args.verbose)
