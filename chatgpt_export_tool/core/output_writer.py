@@ -225,11 +225,9 @@ class OutputWriter:
         """
         if dir_path.exists():
             return False
-        if dir_path != self.output_dir:
-            dir_path.mkdir(parents=True, exist_ok=True)
-            logger.debug(f"Created directory: {dir_path}")
-            return True
-        return False
+        dir_path.mkdir(parents=True, exist_ok=True)
+        logger.debug(f"Created directory: {dir_path}")
+        return True
 
     def _write_single(
         self, conv: Dict[str, Any], filepath: Path, formatter: BaseFormatter

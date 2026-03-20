@@ -275,8 +275,8 @@ class TestOutputWriter:
         assert (tmp_path / "2024-03-01").exists()
         assert (tmp_path / "2024-03-02").exists()
 
-    def test_write_conversations_handles_errors(self, tmp_path):
-        """Test write_conversations records errors for invalid paths."""
+    def test_write_conversations_creates_output_dir(self, tmp_path):
+        """Test write_conversations creates output directory if missing."""
         writer = OutputWriter(
             output_dir=str(tmp_path / "nonexistent"), format_type="txt"
         )
@@ -286,8 +286,10 @@ class TestOutputWriter:
         formatter = TextFormatter()
         result = writer.write_conversations(groups, formatter)
 
-        # Should have recorded an error
-        assert len(result.errors) > 0
+        # Directory should be created and write should succeed
+        assert (tmp_path / "nonexistent").exists()
+        assert result.files_written == 1
+        assert len(result.errors) == 0
 
     def test_ensure_directory_creates_new(self, tmp_path):
         """Test _ensure_directory creates directory when missing."""
@@ -321,9 +323,9 @@ class TestOutputWriterEdgeCases:
 
         assert result.files_written == 0
 
-    def test_write_conversations_merges_errors(self, tmp_path):
-        """Test write_conversations accumulates errors across groups."""
-        writer = OutputWriter(output_dir=str(tmp_path / "bad"), format_type="txt")
+    def test_write_conversations_multiple_groups(self, tmp_path):
+        """Test write_conversations handles multiple groups correctly."""
+        writer = OutputWriter(output_dir=str(tmp_path / "output"), format_type="txt")
 
         groups = {
             "group1": [{"title": "Conv 1", "id": "1"}],
@@ -333,5 +335,6 @@ class TestOutputWriterEdgeCases:
         formatter = TextFormatter()
         result = writer.write_conversations(groups, formatter)
 
-        # Both groups should fail due to bad path
-        assert len(result.errors) >= 2
+        # Both groups should succeed
+        assert result.files_written == 2
+        assert len(result.errors) == 0
