@@ -6,6 +6,7 @@ Provides statistics, structure overview, and field coverage analysis.
 """
 
 import argparse
+from datetime import datetime
 from typing import List, Optional
 
 from chatgpt_export_tool.commands import BaseCommand
@@ -50,9 +51,6 @@ class AnalyzeCommand(BaseCommand):
         file_size = get_file_size(self.filepath)
 
         output_lines = []
-        output_lines.append(f"File: {self.filepath}")
-        output_lines.append(f"Size: {format_size(file_size)} ({file_size:,} bytes)")
-        output_lines.append("")
 
         if self.logger.level <= 20:  # INFO
             output_lines.append(
@@ -66,8 +64,11 @@ class AnalyzeCommand(BaseCommand):
         parser = JSONParser(self.filepath)
         results = parser.analyze(verbose=self.logger.level <= 20)
 
-        # Add file size to results for analysis output
+        # Add metadata to results for analysis output
         results["file_size"] = format_size(file_size)
+        results["filepath"] = self.filepath
+        # Analysis date in format: hh:mm dd-mm-yyyy
+        results["analysis_date"] = datetime.now().strftime("%H:%M %d-%m-%Y")
 
         self.logger.info(f"Found {results['conversation_count']:,} conversations")
         self.logger.info(f"Found {results['message_count']:,} total messages")

@@ -136,6 +136,10 @@ class TextFormatter(BaseFormatter):
         lines.append("ANALYSIS RESULTS")
         lines.append("=" * 60)
         lines.append("")
+        if "analysis_date" in results:
+            lines.append(f"Analysis date: {results['analysis_date']}")
+        if "filepath" in results:
+            lines.append(f"File path: {results['filepath']}")
         if "file_size" in results:
             lines.append(f"File size: {results['file_size']}")
         lines.append(

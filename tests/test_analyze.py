@@ -230,6 +230,9 @@ class TestTextFormatterAnalysis:
             "message_count": 100,
             "all_fields": {"title", "create_time"},
             "sample_conversation": {"title": "Test"},
+            "filepath": "data/conversations.json",
+            "analysis_date": "14:30 20-03-2026",
+            "file_size": "128.11 MB",
         }
         config = AnalyzeConfig(include_fields=False)
         output = formatter._format_analysis(results, config)
@@ -237,6 +240,11 @@ class TestTextFormatterAnalysis:
         # Should contain basic info
         assert "10" in output or "10" in output  # conversation count
         assert "100" in output  # message count
+        # Should contain analysis date and filepath
+        assert "Analysis date:" in output
+        assert "File path:" in output
+        assert "14:30 20-03-2026" in output
+        assert "data/conversations.json" in output
         # Should NOT contain field info
         assert "ALL UNIQUE FIELD NAMES" not in output
         # Should NOT contain sample structure
@@ -250,6 +258,9 @@ class TestTextFormatterAnalysis:
             "message_count": 100,
             "all_fields": {"title", "create_time", "mapping"},
             "sample_conversation": {"title": "Test"},
+            "filepath": "data/conversations.json",
+            "analysis_date": "14:30 20-03-2026",
+            "file_size": "128.11 MB",
         }
         config = AnalyzeConfig(include_fields=True)
         output = formatter._format_analysis(results, config)
@@ -257,6 +268,11 @@ class TestTextFormatterAnalysis:
         # Should contain basic info
         assert "10" in output
         assert "100" in output
+        # Should contain analysis date and filepath
+        assert "Analysis date:" in output
+        assert "File path:" in output
+        assert "14:30 20-03-2026" in output
+        assert "data/conversations.json" in output
         # Should contain field info
         assert "ALL UNIQUE FIELD NAMES" in output
         # Should NOT contain sample structure
@@ -270,9 +286,15 @@ class TestTextFormatterAnalysis:
             "message_count": 100,
             "all_fields": {"title"},
             "sample_conversation": {"title": "Test"},
+            "filepath": "data/conversations.json",
+            "analysis_date": "14:30 20-03-2026",
+            "file_size": "128.11 MB",
         }
         output = formatter._format_analysis(results, None)
 
+        # Should contain analysis date and filepath
+        assert "Analysis date:" in output
+        assert "File path:" in output
         # Should NOT contain field info (default)
         assert "ALL UNIQUE FIELD NAMES" not in output
         # Should NOT contain sample structure
