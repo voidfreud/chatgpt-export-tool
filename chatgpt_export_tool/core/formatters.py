@@ -22,13 +22,11 @@ class VerbosityLevel(Enum):
 
     Attributes:
         MINIMAL: Only threads count + message count (default).
-        FIELDS: Above + field coverage info.
-        VERBOSE: Above + sample structure (full tree).
+        FULL: Above + field coverage info.
     """
 
     MINIMAL = "minimal"
-    FIELDS = "fields"
-    VERBOSE = "verbose"
+    FULL = "full"
 
 
 @dataclass
@@ -56,13 +54,10 @@ class AnalyzeConfig:
         """Infer show_structure and show_fields from verbosity if not explicitly set."""
         logger.debug(f"AnalyzeConfig initialized with verbosity={self.verbosity.value}")
         if self.show_structure is None:
-            self.show_structure = self.verbosity == VerbosityLevel.VERBOSE
-            logger.debug(f"show_structure inferred as {self.show_structure}")
+            self.show_structure = False
+            logger.debug(f"show_structure set to False (structure not used)")
         if self.show_fields is None:
-            self.show_fields = self.verbosity in (
-                VerbosityLevel.FIELDS,
-                VerbosityLevel.VERBOSE,
-            )
+            self.show_fields = self.verbosity == VerbosityLevel.FULL
             logger.debug(f"show_fields inferred as {self.show_fields}")
 
     @property

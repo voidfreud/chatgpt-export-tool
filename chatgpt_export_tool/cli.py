@@ -37,7 +37,7 @@ Exit Codes:
 
 Examples:
   chatgpt-export analyze data.json
-  chatgpt-export analyze data.json --verbose
+  chatgpt-export analyze data.json --verbosity full
   chatgpt-export analyze data.json --output results.txt
 
   chatgpt-export export data.json --format txt --output conversations.txt

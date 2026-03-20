@@ -26,8 +26,6 @@ class AnalyzeCommand(BaseCommand):
         self,
         filepath: str,
         output_file: Optional[str] = None,
-        verbose: bool = False,
-        debug: bool = False,
         fields: str = "all",
         include: Optional[List[str]] = None,
         exclude: Optional[List[str]] = None,
@@ -38,14 +36,12 @@ class AnalyzeCommand(BaseCommand):
         Args:
             filepath: Path to the JSON file to analyze.
             output_file: Optional path to write output to.
-            verbose: If True, enable verbose (INFO) logging.
-            debug: If True, enable debug logging.
             fields: Field selection mode (default: "all").
             include: Metadata fields to include.
             exclude: Metadata fields to exclude.
             verbosity: Verbosity level for analysis output (default: MINIMAL).
         """
-        super().__init__(filepath=filepath, verbose=verbose, debug=debug)
+        super().__init__(filepath=filepath)
         self.output_file = output_file
         self.fields = fields
         self.include = include
@@ -113,8 +109,6 @@ def analyze_command(args: argparse.Namespace) -> int:
     command = AnalyzeCommand(
         filepath=args.file,
         output_file=args.output,
-        verbose=args.verbose,
-        debug=args.debug,
         fields=args.fields,
         include=getattr(args, "include", None),
         exclude=getattr(args, "exclude", None),
@@ -134,18 +128,17 @@ def add_analyze_parser(subparsers) -> argparse.ArgumentParser:
     """
     analyze_parser = subparsers.add_parser(
         "analyze",
-        help="Show statistics, structure, and field coverage of conversations",
+        help="Show statistics and field coverage of conversations",
         description=(
             "Analyze a ChatGPT conversations.json export file.\n\n"
-            "Shows statistics (conversation count, message count), structure overview,\n"
+            "Shows statistics (conversation count, message count)\n"
             "and field coverage analysis for each conversation level."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Verbosity Levels:
   minimal  - Only threads/conversations count + message count (default)
-  fields   - Above + field coverage info (unique field names)
-  verbose  - Above + sample structure (first conversation tree)
+  full     - Above + field coverage info (unique field names)
 
 Field Groups (for --fields groups):
   conversation  - _id, conversation_id, create_time, update_time, title, type
@@ -155,8 +148,8 @@ Field Groups (for --fields groups):
 
 Examples:
   chatgpt-export analyze data.json
-  chatgpt-export analyze data.json --verbosity fields
-  chatgpt-export analyze data.json -V verbose
+  chatgpt-export analyze data.json --verbosity full
+  chatgpt-export analyze data.json -V full
   chatgpt-export analyze data.json --output analysis.txt
   chatgpt-export analyze data.json --fields groups minimal
   chatgpt-export analyze data.json --fields include title,create_time
@@ -209,21 +202,7 @@ Examples:
         type=VerbosityLevel,
         default=VerbosityLevel.MINIMAL,
         choices=list(VerbosityLevel),
-        help="Output verbosity level: minimal (default), fields, or verbose",
-    )
-
-    analyze_parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Show progress information during analysis",
-    )
-
-    analyze_parser.add_argument(
-        "-d",
-        "--debug",
-        action="store_true",
-        help="Show detailed debug information",
+        help="Output verbosity level: minimal (default) or full",
     )
 
     return analyze_parser

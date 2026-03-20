@@ -162,12 +162,6 @@ class TestCLIArguments:
         assert args.command == "export"
         assert args.file == "data.json"
 
-    def test_verbose_flag(self):
-        """Test that verbose flag is parsed correctly."""
-        parser = create_parser()
-        args = parser.parse_args(["analyze", "--verbose", "data.json"])
-        assert args.verbose is True
-
     def test_output_flag(self):
         """Test that output flag is parsed correctly."""
         parser = create_parser()
@@ -178,9 +172,9 @@ class TestCLIArguments:
         """Test that multiple arguments work together."""
         parser = create_parser()
         args = parser.parse_args(
-            ["analyze", "--verbose", "--output", "out.txt", "input.json"]
+            ["analyze", "--verbosity", "full", "--output", "out.txt", "input.json"]
         )
-        assert args.verbose is True
+        assert args.verbosity == VerbosityLevel.FULL
         assert args.output == "out.txt"
         assert args.file == "input.json"
 
@@ -215,13 +209,9 @@ class TestVerbosityLevel:
         """Test MINIMAL verbosity level."""
         assert VerbosityLevel.MINIMAL.value == "minimal"
 
-    def test_verbosity_fields(self):
-        """Test FIELDS verbosity level."""
-        assert VerbosityLevel.FIELDS.value == "fields"
-
-    def test_verbosity_verbose(self):
-        """Test VERBOSE verbosity level."""
-        assert VerbosityLevel.VERBOSE.value == "verbose"
+    def test_verbosity_full(self):
+        """Test FULL verbosity level."""
+        assert VerbosityLevel.FULL.value == "full"
 
 
 class TestAnalyzeConfig:
@@ -238,17 +228,11 @@ class TestAnalyzeConfig:
         assert config.include_fields is False
         assert config.include_structure is False
 
-    def test_fields_includes_fields_only(self):
-        """Test that FIELDS verbosity includes only fields."""
-        config = AnalyzeConfig(verbosity=VerbosityLevel.FIELDS)
+    def test_full_includes_fields_only(self):
+        """Test that FULL verbosity includes only fields (no structure)."""
+        config = AnalyzeConfig(verbosity=VerbosityLevel.FULL)
         assert config.include_fields is True
         assert config.include_structure is False
-
-    def test_verbose_includes_everything(self):
-        """Test that VERBOSE verbosity includes both fields and structure."""
-        config = AnalyzeConfig(verbosity=VerbosityLevel.VERBOSE)
-        assert config.include_fields is True
-        assert config.include_structure is True
 
     def test_explicit_show_fields_override(self):
         """Test that explicit show_fields overrides verbosity inference."""
@@ -288,8 +272,8 @@ class TestTextFormatterAnalysis:
         # Should NOT contain sample structure
         assert "SAMPLE STRUCTURE" not in output
 
-    def test_format_analysis_fields(self):
-        """Test FIELDS verbosity output includes field info."""
+    def test_format_analysis_full(self):
+        """Test FULL verbosity output includes field info."""
         formatter = TextFormatter()
         results = {
             "conversation_count": 10,
@@ -297,7 +281,7 @@ class TestTextFormatterAnalysis:
             "all_fields": {"title", "create_time", "mapping"},
             "sample_conversation": {"title": "Test"},
         }
-        config = AnalyzeConfig(verbosity=VerbosityLevel.FIELDS)
+        config = AnalyzeConfig(verbosity=VerbosityLevel.FULL)
         output = formatter._format_analysis(results, config)
 
         # Should contain basic info
@@ -306,26 +290,6 @@ class TestTextFormatterAnalysis:
         # Should contain field info
         assert "ALL UNIQUE FIELD NAMES" in output
         # Should NOT contain sample structure
-        assert "SAMPLE STRUCTURE" not in output
-
-    def test_format_analysis_verbose(self):
-        """Test VERBOSE verbosity output includes everything."""
-        formatter = TextFormatter()
-        results = {
-            "conversation_count": 10,
-            "message_count": 100,
-            "all_fields": {"title", "create_time", "mapping"},
-            "sample_conversation": {"title": "Test", "id": "123"},
-        }
-        config = AnalyzeConfig(verbosity=VerbosityLevel.VERBOSE)
-        output = formatter._format_analysis(results, config)
-
-        # Should contain basic info
-        assert "10" in output
-        assert "100" in output
-        # Should contain field info
-        assert "ALL UNIQUE FIELD NAMES" in output
-        # Should NOT contain sample structure (removed feature)
         assert "SAMPLE STRUCTURE" not in output
 
     def test_format_analysis_without_config_defaults_to_minimal(self):
@@ -354,31 +318,25 @@ class TestCLIVerbosityArgument:
         args = parser.parse_args(["analyze", "data.json"])
         assert args.verbosity == VerbosityLevel.MINIMAL
 
-    def test_verbosity_fields_flag(self):
-        """Test --verbosity fields flag."""
+    def test_verbosity_full_flag(self):
+        """Test --verbosity full flag."""
         parser = create_parser()
-        args = parser.parse_args(["analyze", "--verbosity", "fields", "data.json"])
-        assert args.verbosity == VerbosityLevel.FIELDS
-
-    def test_verbosity_verbose_flag(self):
-        """Test --verbosity verbose flag."""
-        parser = create_parser()
-        args = parser.parse_args(["analyze", "--verbosity", "verbose", "data.json"])
-        assert args.verbosity == VerbosityLevel.VERBOSE
+        args = parser.parse_args(["analyze", "--verbosity", "full", "data.json"])
+        assert args.verbosity == VerbosityLevel.FULL
 
     def test_verbosity_short_flag(self):
         """Test -V short flag for verbosity."""
         parser = create_parser()
-        args = parser.parse_args(["analyze", "-V", "fields", "data.json"])
-        assert args.verbosity == VerbosityLevel.FIELDS
+        args = parser.parse_args(["analyze", "-V", "full", "data.json"])
+        assert args.verbosity == VerbosityLevel.FULL
 
     def test_verbosity_with_other_flags(self):
         """Test verbosity combined with other flags."""
         parser = create_parser()
         args = parser.parse_args(
-            ["analyze", "-V", "verbose", "--output", "out.txt", "data.json"]
+            ["analyze", "-V", "full", "--output", "out.txt", "data.json"]
         )
-        assert args.verbosity == VerbosityLevel.VERBOSE
+        assert args.verbosity == VerbosityLevel.FULL
         assert args.output == "out.txt"
 
 
