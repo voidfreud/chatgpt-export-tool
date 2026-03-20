@@ -5,18 +5,15 @@ Exports ChatGPT conversations to various formats (txt, json).
 """
 
 import argparse
-import sys
 from typing import Optional, List
 
+from chatgpt_export_tool.commands import BaseCommand
 from chatgpt_export_tool.core.parser import JSONParser
 from chatgpt_export_tool.core.field_config import FieldSelector, MetadataSelector
 from chatgpt_export_tool.core.formatters import get_formatter
-from chatgpt_export_tool.core.utils import (
-    validate_file, setup_logging, get_logger
-)
 
 
-class ExportCommand:
+class ExportCommand(BaseCommand):
     """Command for exporting conversations to various formats."""
     
     def __init__(self, filepath: str, format_type: str = "txt",
@@ -36,50 +33,14 @@ class ExportCommand:
             verbose: If True, enable verbose (INFO) logging.
             debug: If True, enable debug logging.
         """
-        self.filepath = filepath
+        super().__init__(filepath=filepath, verbose=verbose, debug=debug)
         self.format_type = format_type
         self.output_file = output_file
         self.fields = fields
         self.include = include
         self.exclude = exclude
-        
-        # Setup logging
-        setup_logging(verbose=verbose, debug=debug)
-        self.logger = get_logger()
     
-    def run(self) -> int:
-        """Execute the export command.
-        
-        Returns:
-            Exit code (0 for success, 1 for error).
-        """
-        try:
-            self.logger.info(f"Exporting file: {self.filepath}")
-            validate_file(self.filepath)
-            self._export()
-            return 0
-        except FileNotFoundError as e:
-            self.logger.error(f"File not found: {e}")
-            print(f"Error: {e}", file=sys.stderr)
-            return 1
-        except PermissionError as e:
-            self.logger.error(f"Permission denied: {e}")
-            print(f"Error: Permission denied - {e}", file=sys.stderr)
-            return 1
-        except KeyboardInterrupt:
-            self.logger.info("Operation cancelled by user")
-            print("\nOperation cancelled by user.", file=sys.stderr)
-            return 130
-        except Exception as e:
-            self.logger.error(f"Unexpected error: {e}")
-            self.logger.debug(f"Traceback:", exc_info=True)
-            print(f"Error: Unexpected error - {e}", file=sys.stderr)
-            if self.logger.level <= 10:  # DEBUG
-                import traceback
-                traceback.print_exc()
-            return 1
-    
-    def _export(self):
+    def _execute(self):
         """Export conversations to the specified format."""
         self.logger.debug(f"Creating field selector with mode: {self.fields}")
         # Create field selector

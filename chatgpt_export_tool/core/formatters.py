@@ -9,6 +9,10 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional
 
 from chatgpt_export_tool.core.field_config import FieldSelector
+from chatgpt_export_tool.core.utils import get_logger
+
+# Module-level logger for consistent naming across the codebase
+logger = get_logger()
 
 
 class BaseFormatter(ABC):
@@ -50,6 +54,7 @@ class TextFormatter(BaseFormatter):
             include_header: Whether to include headers in output.
             indent: String to use for indentation.
         """
+        logger.debug(f"Initializing TextFormatter: include_header={include_header}, indent='{indent}'")
         self.include_header = include_header
         self.indent = indent
     
@@ -62,13 +67,18 @@ class TextFormatter(BaseFormatter):
         Returns:
             Formatted text string.
         """
+        logger.debug(f"TextFormatter.format: data type = {type(data).__name__}")
         if isinstance(data, dict):
             if 'conversation_count' in data and 'message_count' in data:
+                logger.debug("Detected analysis results, using _format_analysis")
                 return self._format_analysis(data)
+            logger.debug("Using _format_dict for dict data")
             return self._format_dict(data)
         elif isinstance(data, list):
+            logger.debug(f"Using _format_list for list with {len(data)} items")
             return self._format_list(data)
         else:
+            logger.debug("Using str() for scalar data")
             return str(data)
     
     def _format_analysis(self, results: Dict[str, Any]) -> str:
@@ -80,6 +90,8 @@ class TextFormatter(BaseFormatter):
         Returns:
             Formatted analysis text.
         """
+        logger.debug(f"_format_analysis: formatting {results['conversation_count']} conversations, {results['message_count']} messages")
+        
         lines = []
         lines.append("=" * 60)
         lines.append("ANALYSIS RESULTS")
@@ -100,6 +112,7 @@ class TextFormatter(BaseFormatter):
             
             # Categorize and display fields
             categorized = FieldSelector.categorize_fields(results['all_fields'])
+            logger.debug(f"Field categorization: {list(categorized.keys())}")
             
             for category, fields in categorized.items():
                 if fields:
@@ -114,7 +127,9 @@ class TextFormatter(BaseFormatter):
             for key, value in results['sample_conversation'].items():
                 lines.append(f"  {key}: {value}")
         
-        return "\n".join(lines)
+        output = "\n".join(lines)
+        logger.debug(f"_format_analysis: generated output of {len(output)} chars")
+        return output
     
     def _format_dict(self, data: Dict[str, Any], level: int = 0) -> str:
         """Format dictionary as text.
@@ -167,7 +182,10 @@ class TextFormatter(BaseFormatter):
         Returns:
             Formatted conversation text.
         """
+        logger.debug(f"TextFormatter.format_conversation: conv title='{conv.get('title', 'N/A')}', has_mapping={'mapping' in conv and conv['mapping']}")
+        
         if field_selector:
+            logger.debug("Applying field_selector filter to conversation")
             conv = field_selector.filter_conversation(conv)
         
         lines = []
@@ -178,7 +196,9 @@ class TextFormatter(BaseFormatter):
         lines.append("")
         
         if 'mapping' in conv and conv['mapping']:
-            lines.append(f"Messages ({len(conv['mapping'])} nodes):")
+            mapping_size = len(conv['mapping'])
+            logger.debug(f"Processing mapping with {mapping_size} nodes")
+            lines.append(f"Messages ({mapping_size} nodes):")
             for node_id, node in conv['mapping'].items():
                 if 'message' in node and node['message']:
                     msg = node['message']
@@ -197,7 +217,9 @@ class TextFormatter(BaseFormatter):
                     lines.append(f"  [{role}] {text}")
         
         lines.append("-" * 40)
-        return "\n".join(lines)
+        output = "\n".join(lines)
+        logger.debug(f"TextFormatter.format_conversation: generated output of {len(output)} chars")
+        return output
 
 
 class JSONFormatter(BaseFormatter):
@@ -210,6 +232,7 @@ class JSONFormatter(BaseFormatter):
             indent: Number of spaces for indentation.
             sort_keys: Whether to sort dictionary keys.
         """
+        logger.debug(f"Initializing JSONFormatter: indent={indent}, sort_keys={sort_keys}")
         self.indent = indent
         self.sort_keys = sort_keys
     
@@ -222,7 +245,10 @@ class JSONFormatter(BaseFormatter):
         Returns:
             JSON string.
         """
-        return json.dumps(data, indent=self.indent, sort_keys=self.sort_keys)
+        logger.debug(f"JSONFormatter.format: data type = {type(data).__name__}")
+        output = json.dumps(data, indent=self.indent, sort_keys=self.sort_keys)
+        logger.debug(f"JSONFormatter.format: generated JSON output of {len(output)} chars")
+        return output
     
     def format_conversation(self, conv: Dict[str, Any], field_selector=None) -> str:
         """Format a single conversation as JSON.
@@ -234,7 +260,9 @@ class JSONFormatter(BaseFormatter):
         Returns:
             JSON string representation of conversation.
         """
+        logger.debug(f"JSONFormatter.format_conversation: conv title='{conv.get('title', 'N/A')}', has_mapping={'mapping' in conv and conv['mapping']}")
         if field_selector:
+            logger.debug("Applying field_selector filter to conversation")
             conv = field_selector.filter_conversation(conv)
         return self.format(conv)
 
@@ -259,6 +287,10 @@ def get_formatter(format_type: str, **kwargs) -> BaseFormatter:
     Raises:
         ValueError: If formatter type is not supported.
     """
+    logger.debug(f"get_formatter: requested format_type='{format_type}', kwargs={kwargs}")
     if format_type not in FORMATTERS:
+        logger.debug(f"get_formatter: unsupported format '{format_type}'")
         raise ValueError(f"Unsupported format: {format_type}. Available: {list(FORMATTERS.keys())}")
-    return FORMATTERS[format_type](**kwargs)
+    formatter = FORMATTERS[format_type](**kwargs)
+    logger.debug(f"get_formatter: created {type(formatter).__name__} instance")
+    return formatter

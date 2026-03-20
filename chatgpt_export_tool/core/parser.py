@@ -7,7 +7,10 @@ Handles memory-efficient streaming parsing of large JSON files using ijson.
 import ijson
 from typing import Dict, Any, Set
 
-from chatgpt_export_tool.core.utils import get_file_size, format_size
+from chatgpt_export_tool.core.utils import get_logger, get_file_size, format_size
+
+# Module-level logger for consistent naming across the codebase
+logger = get_logger()
 
 
 class JSONParser:
@@ -38,6 +41,8 @@ class JSONParser:
             - all_fields: Set of all unique field names
             - sample_conversation: Sample structure from first conversation
         """
+        logger.debug(f"Starting JSON analysis for file: {self.filepath}")
+        
         results: Dict[str, Any] = {
             'conversation_count': 0,
             'message_count': 0,
@@ -46,6 +51,7 @@ class JSONParser:
         }
         
         with open(self.filepath, 'rb') as f:
+            logger.debug("Opened file, starting ijson streaming parse")
             conversations = ijson.items(f, 'item')
             
             for conv in conversations:
@@ -54,6 +60,7 @@ class JSONParser:
                 
                 # Count messages in mapping
                 if 'mapping' in conv and conv['mapping']:
+                    logger.debug(f"Conversation {results['conversation_count']}: processing mapping with {len(conv['mapping'])} nodes")
                     for node_id, node in conv['mapping'].items():
                         results['all_fields'].update(node.keys())
                         if 'message' in node and node['message']:
@@ -69,6 +76,7 @@ class JSONParser:
                 
                 # Store first conversation as sample
                 if results['sample_conversation'] is None:
+                    logger.debug(f"Storing sample conversation structure (conversation 1)")
                     results['sample_conversation'] = {
                         'title': conv.get('title', 'N/A'),
                         'has_mapping': 'mapping' in conv,
@@ -76,8 +84,9 @@ class JSONParser:
                     }
                 
                 if verbose and results['conversation_count'] % 100 == 0:
-                    print(f"  Processed {results['conversation_count']} conversations...")
+                    logger.debug(f"  Processed {results['conversation_count']} conversations...")
         
+        logger.debug(f"Analysis complete: {results['conversation_count']} conversations, {results['message_count']} messages, {len(results['all_fields'])} unique fields")
         return results
     
     def iterate_conversations(self, verbose: bool = False):
@@ -89,9 +98,14 @@ class JSONParser:
         Yields:
             Each conversation dictionary.
         """
+        logger.debug(f"Starting conversation iteration for file: {self.filepath}")
+        
         with open(self.filepath, 'rb') as f:
             conversations = ijson.items(f, 'item')
+            idx = -1
             for idx, conv in enumerate(conversations):
                 if verbose and (idx + 1) % 100 == 0:
-                    print(f"  Processed {idx + 1} conversations...")
+                    logger.debug(f"  Processed {idx + 1} conversations...")
                 yield conv
+        
+        logger.debug(f"Completed iteration: yielded {idx + 1} conversations total")

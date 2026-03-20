@@ -5,18 +5,15 @@ Analyzes the structure of ChatGPT conversations.json export files.
 """
 
 import argparse
-import sys
 from typing import Optional, List
 
+from chatgpt_export_tool.commands import BaseCommand
 from chatgpt_export_tool.core.parser import JSONParser
-from chatgpt_export_tool.core.field_config import FieldSelector, MetadataSelector
-from chatgpt_export_tool.core.utils import (
-    validate_file, get_file_size, format_size, 
-    setup_logging, get_logger
-)
+from chatgpt_export_tool.core.formatters import TextFormatter
+from chatgpt_export_tool.core.utils import get_file_size, format_size
 
 
-class AnalyzeCommand:
+class AnalyzeCommand(BaseCommand):
     """Command for analyzing JSON file structure."""
     
     def __init__(self, filepath: str, output_file: Optional[str] = None, 
@@ -34,54 +31,14 @@ class AnalyzeCommand:
             include: Metadata fields to include.
             exclude: Metadata fields to exclude.
         """
-        self.filepath = filepath
+        super().__init__(filepath=filepath, verbose=verbose, debug=debug)
         self.output_file = output_file
         self.fields = fields
         self.include = include
         self.exclude = exclude
-        
-        # Setup logging
-        setup_logging(verbose=verbose, debug=debug)
-        self.logger = get_logger()
     
-    def run(self) -> int:
-        """Execute the analyze command.
-        
-        Returns:
-            Exit code (0 for success, 1 for error).
-        """
-        try:
-            self.logger.info(f"Analyzing file: {self.filepath}")
-            validate_file(self.filepath)
-            self._print_analysis()
-            return 0
-        except FileNotFoundError as e:
-            self.logger.error(f"File not found: {e}")
-            print(f"Error: {e}", file=sys.stderr)
-            return 1
-        except ijson.JSONError as e:
-            self.logger.error(f"Invalid JSON file: {e}")
-            print(f"Error: Invalid JSON file - {e}", file=sys.stderr)
-            return 1
-        except PermissionError as e:
-            self.logger.error(f"Permission denied: {e}")
-            print(f"Error: Permission denied - {e}", file=sys.stderr)
-            return 1
-        except KeyboardInterrupt:
-            self.logger.info("Operation cancelled by user")
-            print("\nOperation cancelled by user.", file=sys.stderr)
-            return 130
-        except Exception as e:
-            self.logger.error(f"Unexpected error: {e}")
-            self.logger.debug(f"Traceback:", exc_info=True)
-            print(f"Error: Unexpected error - {e}", file=sys.stderr)
-            if self.logger.level <= 10:  # DEBUG
-                import traceback
-                traceback.print_exc()
-            return 1
-    
-    def _print_analysis(self):
-        """Print the analysis results."""
+    def _execute(self):
+        """Execute the analyze command logic."""
         self.logger.debug(f"Getting file size for: {self.filepath}")
         file_size = get_file_size(self.filepath)
         
@@ -100,42 +57,14 @@ class AnalyzeCommand:
         parser = JSONParser(self.filepath)
         results = parser.analyze(verbose=self.logger.level <= 20)
         
-        output_lines.append("=" * 60)
-        output_lines.append("ANALYSIS RESULTS")
-        output_lines.append("=" * 60)
-        output_lines.append("")
-        output_lines.append(f"Top-level structure: JSON Array of conversation objects")
-        output_lines.append(f"Number of threads/conversations: {results['conversation_count']:,}")
-        output_lines.append(f"Total message nodes in mappings: {results['message_count']:,}")
-        output_lines.append("")
-        
         self.logger.info(f"Found {results['conversation_count']:,} conversations")
         self.logger.info(f"Found {results['message_count']:,} total messages")
         
-        output_lines.append("-" * 60)
-        output_lines.append("ALL UNIQUE FIELD NAMES FOUND:")
-        output_lines.append("-" * 60)
+        # Use TextFormatter._format_analysis() to avoid code duplication
+        formatter = TextFormatter()
+        analysis_output = formatter._format_analysis(results)
         
-        sorted_fields = sorted(results['all_fields'])
-        output_lines.append(f"Total unique fields: {len(sorted_fields)}")
-        output_lines.append("")
-        
-        # Categorize and display fields
-        self.logger.debug("Categorizing fields by hierarchy level")
-        categorized = FieldSelector.categorize_fields(results['all_fields'])
-        
-        for category, fields in categorized.items():
-            if fields:
-                output_lines.append(f"{category.capitalize()}-level fields:")
-                output_lines.append(f"  {', '.join(sorted(fields))}")
-                output_lines.append("")
-        
-        output_lines.append("-" * 60)
-        output_lines.append("SAMPLE STRUCTURE (first conversation):")
-        output_lines.append("-" * 60)
-        if results['sample_conversation']:
-            for key, value in results['sample_conversation'].items():
-                output_lines.append(f"  {key}: {value}")
+        output_lines.append(analysis_output)
         
         output = "\n".join(output_lines)
         
@@ -230,10 +159,3 @@ def add_analyze_parser(subparsers) -> argparse.ArgumentParser:
     )
     
     return analyze_parser
-
-
-# Import ijson at module level for error handling
-try:
-    import ijson
-except ImportError:
-    ijson = None

@@ -21,14 +21,11 @@ The `chatgpt-export` CLI tool parses ChatGPT conversation exports and reports:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/chatgpt-export-tool.git
+git clone https://github.com/alexanderbass/chatgpt-export-tool.git
 cd chatgpt-export-tool
 
-# Install dependencies using uv
+# Install dependencies and package
 uv sync
-
-# Install the package in development mode
-uv pip install -e .
 ```
 
 ### Using pip with uv
@@ -119,7 +116,7 @@ The script organizes fields into these hierarchical levels:
 │   │   └── utils.py
 │   └── data/
 ├── tests/
-│   └── test_analyze_json.py  # Test suite
+│   └── test_analyze.py  # Test suite
 └── Fields.md            # Field reference documentation
 ```
 
@@ -135,7 +132,7 @@ uv run pytest
 uv run pytest --cov=chatgpt_export_tool --cov-report=html
 
 # Run specific test file
-uv run pytest tests/test_analyze_json.py -v
+uv run pytest tests/test_analyze.py -v
 ```
 
 ### Adding Dependencies
