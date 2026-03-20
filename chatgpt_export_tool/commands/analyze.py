@@ -9,12 +9,10 @@ import argparse
 from typing import List, Optional
 
 from chatgpt_export_tool.commands import BaseCommand
+from chatgpt_export_tool.core.field_config import FIELD_GROUPS
 from chatgpt_export_tool.core.formatters import TextFormatter
 from chatgpt_export_tool.core.parser import JSONParser
 from chatgpt_export_tool.core.utils import format_size, get_file_size
-
-# Field groups available for --fields groups option
-FIELD_GROUPS = ["conversation", "message", "metadata", "minimal"]
 
 
 class AnalyzeCommand(BaseCommand):

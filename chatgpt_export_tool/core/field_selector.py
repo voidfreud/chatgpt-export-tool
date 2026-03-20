@@ -3,11 +3,15 @@ Field selection logic.
 
 Provides FieldSelector class for handling field inclusion/exclusion
 with multiple modes (all, none, include, exclude, groups).
+
+Field groups are now defined in field_groups.py as FIELD_GROUP_MAPPING,
+providing a single source of truth.
 """
 
 from typing import Any, Dict, List, Optional, Set
 
 from .category_fields import CATEGORY_FIELDS
+from .field_groups import FIELD_GROUP_MAPPING
 
 
 class FieldSelector:
@@ -15,25 +19,9 @@ class FieldSelector:
 
     Attributes:
         MODES: Valid selection modes.
-        GROUPS: Preset field groups for common selections.
     """
 
     MODES = ["all", "none", "include", "exclude", "groups"]
-
-    # Preset groups (can be defined in fields.json or hardcoded)
-    GROUPS: Dict[str, List[str]] = {
-        "conversation": [
-            "_id",
-            "conversation_id",
-            "create_time",
-            "update_time",
-            "title",
-            "type",
-        ],
-        "message": ["author", "content", "status", "end_turn"],
-        "metadata": ["model_slug", "message_type", "is_archived"],
-        "minimal": ["title", "create_time", "message"],
-    }
 
     def __init__(
         self,
@@ -118,10 +106,11 @@ class FieldSelector:
         elif self.mode == "groups":
             selected = set()
             for group_name in self.groups:
-                if group_name in self.GROUPS:
-                    selected.update(self.GROUPS[group_name])
+                # Use FIELD_GROUP_MAPPING from field_groups.py (single source of truth)
+                if group_name in FIELD_GROUP_MAPPING:
+                    selected.update(FIELD_GROUP_MAPPING[group_name])
                 else:
-                    # Try to find group in categories
+                    # Try to find group in categories (for backward compatibility)
                     if group_name in CATEGORY_FIELDS:
                         selected.update(CATEGORY_FIELDS[group_name])
             return selected & all_fields

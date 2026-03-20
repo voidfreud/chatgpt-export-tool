@@ -9,6 +9,7 @@ import fnmatch
 from typing import Any, Dict, List, Optional, Set
 
 from .category_fields import METADATA_FIELDS
+from .validators import ValidationResult, validate_metadata_pattern
 
 
 class MetadataSelector:
@@ -204,3 +205,28 @@ class MetadataSelector:
             return set()
         available_metadata = set(METADATA_FIELDS.keys())
         return self._get_matching_fields(self.exclude_fields, available_metadata)
+
+    def validate(self) -> ValidationResult:
+        """Validate the current include/exclude patterns.
+
+        Returns:
+            ValidationResult with any errors or warnings.
+        """
+        result = ValidationResult()
+
+        # Validate include patterns
+        for pattern in self.include_fields:
+            pattern_result = validate_metadata_pattern(pattern)
+            result.errors.extend(pattern_result.errors)
+            result.warnings.extend(pattern_result.warnings)
+
+        # Validate exclude patterns
+        for pattern in self.exclude_fields:
+            pattern_result = validate_metadata_pattern(pattern)
+            result.errors.extend(pattern_result.errors)
+            result.warnings.extend(pattern_result.warnings)
+
+        if result.errors:
+            result.is_valid = False
+
+        return result
