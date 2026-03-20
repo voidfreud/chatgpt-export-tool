@@ -129,10 +129,11 @@ def format_timestamp(timestamp: float) -> str:
     """Format a Unix timestamp to human-readable date string.
 
     Args:
-        timestamp: Unix timestamp (seconds since epoch).
+        timestamp: Unix timestamp (seconds since epoch). May be float, int, or Decimal.
 
     Returns:
         Formatted string in "hh:mm dd-mm-yyyy" format.
     """
-    dt = datetime.fromtimestamp(timestamp)
+    # Handle Decimal values from JSON parser
+    dt = datetime.fromtimestamp(float(timestamp))
     return dt.strftime("%H:%M %d-%m-%Y")
