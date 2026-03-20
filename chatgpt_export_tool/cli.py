@@ -14,7 +14,7 @@ from chatgpt_export_tool.commands.export import add_export_parser, export_comman
 
 def create_parser() -> argparse.ArgumentParser:
     """Create the CLI argument parser.
-    
+
     Returns:
         Configured ArgumentParser instance.
     """
@@ -35,44 +35,37 @@ Examples:
   chatgpt-export export data.json --format txt --output report.txt
   chatgpt-export export data.json --format json --output data.json
   chatgpt-export export data.json --fields include title,message
-        """
+        """,
     )
-    
-    parser.add_argument(
-        '--version',
-        action='version',
-        version='%(prog)s 0.1'
-    )
-    
-    subparsers = parser.add_subparsers(
-        dest='command',
-        help='Available commands'
-    )
-    
+
+    parser.add_argument("--version", action="version", version="%(prog)s 0.1")
+
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
     # Add subcommand parsers
     add_analyze_parser(subparsers)
     add_export_parser(subparsers)
-    
+
     return parser
 
 
 def main() -> int:
     """Main entry point for the CLI.
-    
+
     Returns:
         Exit code (0 for success, 1 for error).
     """
     parser = create_parser()
     args = parser.parse_args()
-    
+
     if args.command is None:
         parser.print_help()
         return 1
-    
+
     # Dispatch to appropriate command
-    if args.command == 'analyze':
+    if args.command == "analyze":
         return analyze_command(args)
-    elif args.command == 'export':
+    elif args.command == "export":
         return export_command(args)
     else:
         parser.print_help()

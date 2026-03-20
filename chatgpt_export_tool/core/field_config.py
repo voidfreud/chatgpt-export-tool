@@ -12,14 +12,14 @@ For direct imports, prefer:
 
 # Re-export constants from category_fields for backward compatibility
 from .category_fields import CATEGORY_FIELDS, METADATA_FIELDS
+from .field_selector import FieldSelector
 
 # Re-export classes from specialized modules for backward compatibility
 from .metadata_selector import MetadataSelector
-from .field_selector import FieldSelector
 
 __all__ = [
     "CATEGORY_FIELDS",
-    "METADATA_FIELDS", 
+    "METADATA_FIELDS",
     "MetadataSelector",
     "FieldSelector",
 ]

@@ -7,32 +7,32 @@ Provides command implementations for analyze and export operations.
 import sys
 from abc import ABC, abstractmethod
 
-from chatgpt_export_tool.core.utils import validate_file, setup_logging, get_logger
+from chatgpt_export_tool.core.utils import get_logger, setup_logging, validate_file
 
 
 class BaseCommand(ABC):
     """Abstract base class for command implementations.
-    
+
     Provides common error handling and logging setup.
     """
-    
+
     def __init__(self, filepath: str, verbose: bool = False, debug: bool = False):
         """Initialize base command.
-        
+
         Args:
             filepath: Path to the JSON file to process.
             verbose: If True, enable verbose (INFO) logging.
             debug: If True, enable debug logging.
         """
         self.filepath = filepath
-        
+
         # Setup logging
         setup_logging(verbose=verbose, debug=debug)
         self.logger = get_logger()
-    
+
     def run(self) -> int:
         """Execute the command with common error handling.
-        
+
         Returns:
             Exit code (0 for success, 1 for error).
         """
@@ -59,20 +59,21 @@ class BaseCommand(ABC):
             print(f"Error: Unexpected error - {e}", file=sys.stderr)
             if self.logger.level <= 10:  # DEBUG
                 import traceback
+
                 traceback.print_exc()
             return 1
-    
+
     @abstractmethod
     def _execute(self):
         """Execute the specific command logic.
-        
+
         Must be implemented by subclasses.
         """
         pass
 
 
-from chatgpt_export_tool.commands.analyze import analyze_command, AnalyzeCommand
-from chatgpt_export_tool.commands.export import export_command, ExportCommand
+from chatgpt_export_tool.commands.analyze import AnalyzeCommand, analyze_command
+from chatgpt_export_tool.commands.export import ExportCommand, export_command
 
 __all__ = [
     "BaseCommand",

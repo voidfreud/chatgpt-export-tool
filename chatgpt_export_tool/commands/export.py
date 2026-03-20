@@ -5,24 +5,30 @@ Exports ChatGPT conversations to various formats (txt, json).
 """
 
 import argparse
-from typing import Optional, List
+from typing import List, Optional
 
 from chatgpt_export_tool.commands import BaseCommand
-from chatgpt_export_tool.core.parser import JSONParser
 from chatgpt_export_tool.core.field_config import FieldSelector, MetadataSelector
 from chatgpt_export_tool.core.formatters import get_formatter
+from chatgpt_export_tool.core.parser import JSONParser
 
 
 class ExportCommand(BaseCommand):
     """Command for exporting conversations to various formats."""
-    
-    def __init__(self, filepath: str, format_type: str = "txt",
-                 output_file: Optional[str] = None, fields: str = "all",
-                 include: Optional[List[str]] = None, 
-                 exclude: Optional[List[str]] = None,
-                 verbose: bool = False, debug: bool = False):
+
+    def __init__(
+        self,
+        filepath: str,
+        format_type: str = "txt",
+        output_file: Optional[str] = None,
+        fields: str = "all",
+        include: Optional[List[str]] = None,
+        exclude: Optional[List[str]] = None,
+        verbose: bool = False,
+        debug: bool = False,
+    ):
         """Initialize export command.
-        
+
         Args:
             filepath: Path to the JSON file to export.
             format_type: Output format ('txt' or 'json').
@@ -39,56 +45,60 @@ class ExportCommand(BaseCommand):
         self.fields = fields
         self.include = include
         self.exclude = exclude
-    
+
     def _execute(self):
         """Export conversations to the specified format."""
         self.logger.debug(f"Creating field selector with mode: {self.fields}")
         # Create field selector
         field_selector = FieldSelector.from_string(self.fields)
-        
+
         # Create metadata selector if include/exclude provided
         metadata_selector = None
         if self.include or self.exclude:
-            self.logger.debug(f"Creating metadata selector: include={self.include}, exclude={self.exclude}")
+            self.logger.debug(
+                f"Creating metadata selector: include={self.include}, exclude={self.exclude}"
+            )
             metadata_selector = MetadataSelector.from_args(
                 include=self.include, exclude=self.exclude
             )
             included = metadata_selector.get_included_fields()
             excluded = metadata_selector.get_excluded_fields()
-            self.logger.info(f"Metadata filtering: including={included if included else 'all'}, excluding={excluded if excluded else 'none'}")
-        
+            self.logger.info(
+                f"Metadata filtering: including={included if included else 'all'}, excluding={excluded if excluded else 'none'}"
+            )
+
         self.logger.debug(f"Creating formatter for type: {self.format_type}")
         # Create formatter
         formatter = get_formatter(self.format_type)
-        
+
         # Parse and export
         self.logger.debug(f"Parsing file: {self.filepath}")
         parser = JSONParser(self.filepath)
-        
+
         if self.logger.level <= 20:  # INFO
             print(f"Exporting {self.filepath} to {self.format_type} format...")
-        
+
         self.logger.info(f"Starting export to {self.format_type} format")
-        
+
         conversations = []
         for conv in parser.iterate_conversations(verbose=self.logger.level <= 20):
             # Apply field filtering
             filtered_conv = field_selector.filter_conversation(conv)
-            
+
             # Apply metadata filtering if metadata selector is configured
             if metadata_selector:
                 filtered_conv = metadata_selector.filter_metadata(filtered_conv)
                 self.logger.debug(f"Metadata filtering applied to conversation")
-            
+
             formatted = formatter.format_conversation(filtered_conv, field_selector)
             conversations.append(formatted)
-        
+
         self.logger.info(f"Exported {len(conversations)} conversations")
-        
+
         output = "\n".join(conversations)
-        
+
         if self.output_file:
-            with open(self.output_file, 'w') as f:
+            with open(self.output_file, "w") as f:
                 f.write(output)
             self.logger.info(f"Output written to: {self.output_file}")
             print(f"Output written to: {self.output_file}")
@@ -98,10 +108,10 @@ class ExportCommand(BaseCommand):
 
 def export_command(args: argparse.Namespace) -> int:
     """Entry point for the export subcommand.
-    
+
     Args:
         args: Parsed command-line arguments.
-        
+
     Returns:
         Exit code (0 for success, 1 for error).
     """
@@ -110,79 +120,80 @@ def export_command(args: argparse.Namespace) -> int:
         format_type=args.format,
         output_file=args.output,
         fields=args.fields,
-        include=getattr(args, 'include', None),
-        exclude=getattr(args, 'exclude', None),
+        include=getattr(args, "include", None),
+        exclude=getattr(args, "exclude", None),
         verbose=args.verbose,
-        debug=args.debug
+        debug=args.debug,
     )
     return command.run()
 
 
 def add_export_parser(subparsers) -> argparse.ArgumentParser:
     """Add export subcommand parser.
-    
+
     Args:
         subparsers: Subparsers object from argparse.
-        
+
     Returns:
         Configured argument parser for export command.
     """
     export_parser = subparsers.add_parser(
-        "export",
-        help="Export conversations to various formats"
+        "export", help="Export conversations to various formats"
     )
-    
+
+    export_parser.add_argument("file", help="Path to the JSON file to export")
+
     export_parser.add_argument(
-        "file",
-        help="Path to the JSON file to export"
-    )
-    
-    export_parser.add_argument(
-        "--format", "-F",
+        "--format",
+        "-F",
         choices=["txt", "json"],
         default="txt",
-        help="Output format (default: txt)"
+        help="Output format (default: txt)",
     )
-    
+
     # Create a mutually exclusive group for --fields vs --include/--exclude
     field_group = export_parser.add_mutually_exclusive_group()
-    
+
     field_group.add_argument(
-        "--fields", "-f",
+        "--fields",
+        "-f",
         default="all",
-        help="Field selection mode: all, none, include <fields>, exclude <fields>, groups <groups>"
+        help="Field selection mode: all, none, include <fields>, exclude <fields>, groups <groups>",
     )
-    
+
     field_group.add_argument(
         "--include",
-        nargs='+',
+        nargs="+",
         metavar="FIELD",
-        help="Metadata fields to include (use '*' for all, or specific field names)"
+        help="Metadata fields to include (use '*' for all, or specific field names)",
     )
-    
+
     field_group.add_argument(
         "--exclude",
-        nargs='+',
+        nargs="+",
         metavar="FIELD",
-        help="Metadata fields to exclude (use '*' for all, or specific field names)"
+        help="Metadata fields to exclude (use '*' for all, or specific field names)",
     )
-    
+
     export_parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         metavar="PATH",
-        help="Write output to the specified file instead of stdout"
+        help="Write output to the specified file instead of stdout",
     )
-    
+
     export_parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
-        help="Enable verbose output with progress information"
+        help="Enable verbose output with progress information",
     )
-    
+
     export_parser.add_argument(
-        "-d", "--debug",
+        "-d",
+        "--debug",
         action="store_true",
-        help="Enable debug output with detailed logging"
+        help="Enable debug output with detailed logging",
     )
-    
+
     return export_parser
