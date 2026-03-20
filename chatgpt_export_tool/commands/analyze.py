@@ -10,7 +10,11 @@ from typing import List, Optional
 
 from chatgpt_export_tool.commands import BaseCommand
 from chatgpt_export_tool.core.field_config import FIELD_GROUPS
-from chatgpt_export_tool.core.formatters import TextFormatter
+from chatgpt_export_tool.core.formatters import (
+    AnalyzeConfig,
+    TextFormatter,
+    VerbosityLevel,
+)
 from chatgpt_export_tool.core.parser import JSONParser
 from chatgpt_export_tool.core.utils import format_size, get_file_size
 
@@ -27,6 +31,7 @@ class AnalyzeCommand(BaseCommand):
         fields: str = "all",
         include: Optional[List[str]] = None,
         exclude: Optional[List[str]] = None,
+        verbosity: VerbosityLevel = VerbosityLevel.MINIMAL,
     ):
         """Initialize analyze command.
 
@@ -38,12 +43,14 @@ class AnalyzeCommand(BaseCommand):
             fields: Field selection mode (default: "all").
             include: Metadata fields to include.
             exclude: Metadata fields to exclude.
+            verbosity: Verbosity level for analysis output (default: MINIMAL).
         """
         super().__init__(filepath=filepath, verbose=verbose, debug=debug)
         self.output_file = output_file
         self.fields = fields
         self.include = include
         self.exclude = exclude
+        self.verbosity = verbosity
 
     def _execute(self):
         """Execute the analyze command logic."""
@@ -70,9 +77,13 @@ class AnalyzeCommand(BaseCommand):
         self.logger.info(f"Found {results['conversation_count']:,} conversations")
         self.logger.info(f"Found {results['message_count']:,} total messages")
 
+        # Create AnalyzeConfig based on verbosity level
+        analyze_config = AnalyzeConfig(verbosity=self.verbosity)
+        self.logger.debug(f"Using AnalyzeConfig with verbosity={self.verbosity.value}")
+
         # Use TextFormatter._format_analysis() to avoid code duplication
         formatter = TextFormatter()
-        analysis_output = formatter._format_analysis(results)
+        analysis_output = formatter._format_analysis(results, analyze_config)
 
         output_lines.append(analysis_output)
 
@@ -104,6 +115,7 @@ def analyze_command(args: argparse.Namespace) -> int:
         fields=args.fields,
         include=getattr(args, "include", None),
         exclude=getattr(args, "exclude", None),
+        verbosity=args.verbosity,
     )
     return command.run()
 
@@ -127,6 +139,11 @@ def add_analyze_parser(subparsers) -> argparse.ArgumentParser:
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+Verbosity Levels:
+  minimal  - Only threads/conversations count + message count (default)
+  fields   - Above + field coverage info (unique field names)
+  verbose  - Above + sample structure (first conversation tree)
+
 Field Groups (for --fields groups):
   conversation  - _id, conversation_id, create_time, update_time, title, type
   message       - author, content, status, end_turn
@@ -135,7 +152,8 @@ Field Groups (for --fields groups):
 
 Examples:
   chatgpt-export analyze data.json
-  chatgpt-export analyze data.json --verbose
+  chatgpt-export analyze data.json --verbosity fields
+  chatgpt-export analyze data.json -V verbose
   chatgpt-export analyze data.json --output analysis.txt
   chatgpt-export analyze data.json --fields groups minimal
   chatgpt-export analyze data.json --fields include title,create_time
@@ -180,6 +198,15 @@ Examples:
         "--output",
         metavar="PATH",
         help="Write output to file instead of stdout",
+    )
+
+    analyze_parser.add_argument(
+        "-V",
+        "--verbosity",
+        type=VerbosityLevel,
+        default=VerbosityLevel.MINIMAL,
+        choices=list(VerbosityLevel),
+        help="Output verbosity level: minimal (default), fields, or verbose",
     )
 
     analyze_parser.add_argument(

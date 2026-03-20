@@ -6,6 +6,8 @@ Provides text, JSON, and future CSV formatting support.
 
 import json
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from chatgpt_export_tool.core.field_config import FieldSelector
@@ -13,6 +15,65 @@ from chatgpt_export_tool.core.utils import get_logger
 
 # Module-level logger for consistent naming across the codebase
 logger = get_logger()
+
+
+class VerbosityLevel(Enum):
+    """Verbosity levels for analyze output.
+
+    Attributes:
+        MINIMAL: Only threads count + message count (default).
+        FIELDS: Above + field coverage info.
+        VERBOSE: Above + sample structure (full tree).
+    """
+
+    MINIMAL = "minimal"
+    FIELDS = "fields"
+    VERBOSE = "verbose"
+
+
+@dataclass
+class AnalyzeConfig:
+    """Configuration for analyze output verbosity.
+
+    Attributes:
+        verbosity: Level of detail in the output (default: MINIMAL).
+        show_structure: Whether to show sample structure tree.
+            Inferred from verbosity if not explicitly set.
+        show_fields: Whether to show field coverage info.
+            Inferred from verbosity if not explicitly set.
+
+    Example:
+        >>> config = AnalyzeConfig()  # minimal by default
+        >>> config = AnalyzeConfig(verbosity=VerbosityLevel.FIELDS)
+        >>> config = AnalyzeConfig(verbosity=VerbosityLevel.VERBOSE, show_fields=False)
+    """
+
+    verbosity: VerbosityLevel = VerbosityLevel.MINIMAL
+    show_structure: Optional[bool] = None
+    show_fields: Optional[bool] = None
+
+    def __post_init__(self):
+        """Infer show_structure and show_fields from verbosity if not explicitly set."""
+        logger.debug(f"AnalyzeConfig initialized with verbosity={self.verbosity.value}")
+        if self.show_structure is None:
+            self.show_structure = self.verbosity == VerbosityLevel.VERBOSE
+            logger.debug(f"show_structure inferred as {self.show_structure}")
+        if self.show_fields is None:
+            self.show_fields = self.verbosity in (
+                VerbosityLevel.FIELDS,
+                VerbosityLevel.VERBOSE,
+            )
+            logger.debug(f"show_fields inferred as {self.show_fields}")
+
+    @property
+    def include_structure(self) -> bool:
+        """Whether to include sample structure in output."""
+        return bool(self.show_structure)
+
+    @property
+    def include_fields(self) -> bool:
+        """Whether to include field coverage info in output."""
+        return bool(self.show_fields)
 
 
 class BaseFormatter(ABC):
@@ -60,11 +121,13 @@ class TextFormatter(BaseFormatter):
         self.include_header = include_header
         self.indent = indent
 
-    def format(self, data: Any) -> str:
+    def format(self, data: Any, analyze_config: Optional[AnalyzeConfig] = None) -> str:
         """Format data as human-readable text.
 
         Args:
             data: Data to format (can be analysis results or conversations).
+            analyze_config: Optional configuration for analysis output verbosity.
+                When provided and data is analysis results, controls verbosity.
 
         Returns:
             Formatted text string.
@@ -73,7 +136,7 @@ class TextFormatter(BaseFormatter):
         if isinstance(data, dict):
             if "conversation_count" in data and "message_count" in data:
                 logger.debug("Detected analysis results, using _format_analysis")
-                return self._format_analysis(data)
+                return self._format_analysis(data, analyze_config)
             logger.debug("Using _format_dict for dict data")
             return self._format_dict(data)
         elif isinstance(data, list):
@@ -83,20 +146,32 @@ class TextFormatter(BaseFormatter):
             logger.debug("Using str() for scalar data")
             return str(data)
 
-    def _format_analysis(self, results: Dict[str, Any]) -> str:
-        """Format analysis results as text.
+    def _format_analysis(
+        self, results: Dict[str, Any], config: Optional[AnalyzeConfig] = None
+    ) -> str:
+        """Format analysis results as text with configurable verbosity.
 
         Args:
             results: Analysis results dictionary.
+            config: Optional AnalyzeConfig to control verbosity.
+                Defaults to AnalyzeConfig() (minimal output).
 
         Returns:
             Formatted analysis text.
         """
+        if config is None:
+            config = AnalyzeConfig()
+            logger.debug("No config provided, using default AnalyzeConfig()")
+
         logger.debug(
-            f"_format_analysis: formatting {results['conversation_count']} conversations, {results['message_count']} messages"
+            f"_format_analysis: formatting {results['conversation_count']} conversations, "
+            f"{results['message_count']} messages, verbosity={config.verbosity.value}, "
+            f"include_fields={config.include_fields}, include_structure={config.include_structure}"
         )
 
         lines = []
+
+        # Always show basic info (minimal level)
         lines.append("=" * 60)
         lines.append("ANALYSIS RESULTS")
         lines.append("=" * 60)
@@ -108,7 +183,8 @@ class TextFormatter(BaseFormatter):
         lines.append(f"Total message nodes in mappings: {results['message_count']:,}")
         lines.append("")
 
-        if "all_fields" in results:
+        # Show field coverage info if configured
+        if config.include_fields and "all_fields" in results:
             lines.append("-" * 60)
             lines.append("ALL UNIQUE FIELD NAMES FOUND:")
             lines.append("-" * 60)
@@ -126,7 +202,8 @@ class TextFormatter(BaseFormatter):
                     lines.append(f"  {', '.join(sorted(fields))}")
                     lines.append("")
 
-        if results.get("sample_conversation"):
+        # Show sample structure if configured (verbose only)
+        if config.include_structure and results.get("sample_conversation"):
             lines.append("-" * 60)
             lines.append("SAMPLE STRUCTURE (first conversation):")
             lines.append("-" * 60)

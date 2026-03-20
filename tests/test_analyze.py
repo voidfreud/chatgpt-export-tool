@@ -13,6 +13,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Import from the new package structure
 from chatgpt_export_tool.cli import create_parser, main
 from chatgpt_export_tool.core.field_config import FieldSelector
+from chatgpt_export_tool.core.formatters import (
+    AnalyzeConfig,
+    TextFormatter,
+    VerbosityLevel,
+)
 from chatgpt_export_tool.core.parser import JSONParser, format_size, get_file_size
 
 
@@ -201,6 +206,180 @@ class TestMainFunction:
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 0
+
+
+class TestVerbosityLevel:
+    """Test the VerbosityLevel enum."""
+
+    def test_verbosity_minimal(self):
+        """Test MINIMAL verbosity level."""
+        assert VerbosityLevel.MINIMAL.value == "minimal"
+
+    def test_verbosity_fields(self):
+        """Test FIELDS verbosity level."""
+        assert VerbosityLevel.FIELDS.value == "fields"
+
+    def test_verbosity_verbose(self):
+        """Test VERBOSE verbosity level."""
+        assert VerbosityLevel.VERBOSE.value == "verbose"
+
+
+class TestAnalyzeConfig:
+    """Test the AnalyzeConfig dataclass."""
+
+    def test_default_verbosity_is_minimal(self):
+        """Test that default verbosity is MINIMAL."""
+        config = AnalyzeConfig()
+        assert config.verbosity == VerbosityLevel.MINIMAL
+
+    def test_minimal_includes_nothing(self):
+        """Test that MINIMAL verbosity includes no fields or structure."""
+        config = AnalyzeConfig(verbosity=VerbosityLevel.MINIMAL)
+        assert config.include_fields is False
+        assert config.include_structure is False
+
+    def test_fields_includes_fields_only(self):
+        """Test that FIELDS verbosity includes only fields."""
+        config = AnalyzeConfig(verbosity=VerbosityLevel.FIELDS)
+        assert config.include_fields is True
+        assert config.include_structure is False
+
+    def test_verbose_includes_everything(self):
+        """Test that VERBOSE verbosity includes both fields and structure."""
+        config = AnalyzeConfig(verbosity=VerbosityLevel.VERBOSE)
+        assert config.include_fields is True
+        assert config.include_structure is True
+
+    def test_explicit_show_fields_override(self):
+        """Test that explicit show_fields overrides verbosity inference."""
+        config = AnalyzeConfig(verbosity=VerbosityLevel.MINIMAL, show_fields=True)
+        assert config.include_fields is True
+        # show_structure should still be False from minimal
+        assert config.include_structure is False
+
+    def test_explicit_show_structure_override(self):
+        """Test that explicit show_structure overrides verbosity inference."""
+        config = AnalyzeConfig(verbosity=VerbosityLevel.MINIMAL, show_structure=True)
+        # show_fields should still be False from minimal
+        assert config.include_fields is False
+        assert config.include_structure is True
+
+
+class TestTextFormatterAnalysis:
+    """Test TextFormatter analysis output with verbosity."""
+
+    def test_format_analysis_minimal(self):
+        """Test minimal verbosity output contains only basic info."""
+        formatter = TextFormatter()
+        results = {
+            "conversation_count": 10,
+            "message_count": 100,
+            "all_fields": {"title", "create_time"},
+            "sample_conversation": {"title": "Test"},
+        }
+        config = AnalyzeConfig(verbosity=VerbosityLevel.MINIMAL)
+        output = formatter._format_analysis(results, config)
+
+        # Should contain basic info
+        assert "10" in output or "10" in output  # conversation count
+        assert "100" in output  # message count
+        # Should NOT contain field info
+        assert "ALL UNIQUE FIELD NAMES" not in output
+        # Should NOT contain sample structure
+        assert "SAMPLE STRUCTURE" not in output
+
+    def test_format_analysis_fields(self):
+        """Test FIELDS verbosity output includes field info."""
+        formatter = TextFormatter()
+        results = {
+            "conversation_count": 10,
+            "message_count": 100,
+            "all_fields": {"title", "create_time", "mapping"},
+            "sample_conversation": {"title": "Test"},
+        }
+        config = AnalyzeConfig(verbosity=VerbosityLevel.FIELDS)
+        output = formatter._format_analysis(results, config)
+
+        # Should contain basic info
+        assert "10" in output
+        assert "100" in output
+        # Should contain field info
+        assert "ALL UNIQUE FIELD NAMES" in output
+        # Should NOT contain sample structure
+        assert "SAMPLE STRUCTURE" not in output
+
+    def test_format_analysis_verbose(self):
+        """Test VERBOSE verbosity output includes everything."""
+        formatter = TextFormatter()
+        results = {
+            "conversation_count": 10,
+            "message_count": 100,
+            "all_fields": {"title", "create_time", "mapping"},
+            "sample_conversation": {"title": "Test", "id": "123"},
+        }
+        config = AnalyzeConfig(verbosity=VerbosityLevel.VERBOSE)
+        output = formatter._format_analysis(results, config)
+
+        # Should contain basic info
+        assert "10" in output
+        assert "100" in output
+        # Should contain field info
+        assert "ALL UNIQUE FIELD NAMES" in output
+        # Should contain sample structure
+        assert "SAMPLE STRUCTURE" in output
+
+    def test_format_analysis_without_config_defaults_to_minimal(self):
+        """Test that _format_analysis without config defaults to minimal."""
+        formatter = TextFormatter()
+        results = {
+            "conversation_count": 10,
+            "message_count": 100,
+            "all_fields": {"title"},
+            "sample_conversation": {"title": "Test"},
+        }
+        output = formatter._format_analysis(results, None)
+
+        # Should NOT contain field info (minimal default)
+        assert "ALL UNIQUE FIELD NAMES" not in output
+        # Should NOT contain sample structure
+        assert "SAMPLE STRUCTURE" not in output
+
+
+class TestCLIVerbosityArgument:
+    """Test CLI argument parsing for verbosity."""
+
+    def test_default_verbosity_minimal(self):
+        """Test that default verbosity is minimal when not specified."""
+        parser = create_parser()
+        args = parser.parse_args(["analyze", "data.json"])
+        assert args.verbosity == VerbosityLevel.MINIMAL
+
+    def test_verbosity_fields_flag(self):
+        """Test --verbosity fields flag."""
+        parser = create_parser()
+        args = parser.parse_args(["analyze", "--verbosity", "fields", "data.json"])
+        assert args.verbosity == VerbosityLevel.FIELDS
+
+    def test_verbosity_verbose_flag(self):
+        """Test --verbosity verbose flag."""
+        parser = create_parser()
+        args = parser.parse_args(["analyze", "--verbosity", "verbose", "data.json"])
+        assert args.verbosity == VerbosityLevel.VERBOSE
+
+    def test_verbosity_short_flag(self):
+        """Test -V short flag for verbosity."""
+        parser = create_parser()
+        args = parser.parse_args(["analyze", "-V", "fields", "data.json"])
+        assert args.verbosity == VerbosityLevel.FIELDS
+
+    def test_verbosity_with_other_flags(self):
+        """Test verbosity combined with other flags."""
+        parser = create_parser()
+        args = parser.parse_args(
+            ["analyze", "-V", "verbose", "--output", "out.txt", "data.json"]
+        )
+        assert args.verbosity == VerbosityLevel.VERBOSE
+        assert args.output == "out.txt"
 
 
 if __name__ == "__main__":
