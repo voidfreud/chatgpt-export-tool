@@ -2,7 +2,7 @@
 Export command for chatgpt_export_tool.
 
 Exports ChatGPT conversations to various formats (txt, json) with
-flexible field selection and metadata filtering.
+flexible field selection, metadata filtering, and split options.
 """
 
 import argparse
@@ -10,12 +10,13 @@ from typing import List, Optional
 
 from chatgpt_export_tool.commands import BaseCommand
 from chatgpt_export_tool.core.field_config import (
-    FIELD_GROUPS,
     FieldSelector,
     MetadataSelector,
 )
 from chatgpt_export_tool.core.formatters import get_formatter
+from chatgpt_export_tool.core.output_writer import OutputWriter
 from chatgpt_export_tool.core.parser import JSONParser
+from chatgpt_export_tool.core.splitter import SplitMode, SplitProcessor
 
 
 class ExportCommand(BaseCommand):
@@ -26,6 +27,8 @@ class ExportCommand(BaseCommand):
         filepath: str,
         format_type: str = "txt",
         output_file: Optional[str] = None,
+        output_dir: Optional[str] = None,
+        split_mode: str = "single",
         fields: str = "all",
         include: Optional[List[str]] = None,
         exclude: Optional[List[str]] = None,
@@ -37,7 +40,9 @@ class ExportCommand(BaseCommand):
         Args:
             filepath: Path to the JSON file to export.
             format_type: Output format ('txt' or 'json').
-            output_file: Optional path to write output to.
+            output_file: Optional path to write single file output to.
+            output_dir: Optional output directory for split mode.
+            split_mode: Split mode ('single', 'subject', 'date').
             fields: Field selection mode.
             include: Metadata fields to include.
             exclude: Metadata fields to exclude.
@@ -47,6 +52,8 @@ class ExportCommand(BaseCommand):
         super().__init__(filepath=filepath, verbose=verbose, debug=debug)
         self.format_type = format_type
         self.output_file = output_file
+        self.output_dir = output_dir or "output"
+        self.split_mode = SplitMode(split_mode)
         self.fields = fields
         self.include = include
         self.exclude = exclude
@@ -83,8 +90,30 @@ class ExportCommand(BaseCommand):
         if self.logger.level <= 20:  # INFO
             print(f"Exporting {self.filepath} to {self.format_type} format...")
 
-        self.logger.info(f"Starting export to {self.format_type} format")
+        self.logger.info(f"Starting export with split mode: {self.split_mode.value}")
 
+        if self.split_mode == SplitMode.SINGLE and not self.output_dir:
+            # Legacy single-file mode
+            self._export_single(parser, field_selector, metadata_selector, formatter)
+        else:
+            # Split mode with directory output
+            self._export_split(parser, field_selector, metadata_selector, formatter)
+
+    def _export_single(
+        self,
+        parser: JSONParser,
+        field_selector: FieldSelector,
+        metadata_selector: Optional[MetadataSelector],
+        formatter,
+    ):
+        """Export all conversations to a single file (legacy mode).
+
+        Args:
+            parser: JSONParser instance.
+            field_selector: FieldSelector instance.
+            metadata_selector: Optional MetadataSelector instance.
+            formatter: Formatter instance.
+        """
         conversations = []
         for conv in parser.iterate_conversations(verbose=self.logger.level <= 20):
             # Apply field filtering
@@ -110,6 +139,64 @@ class ExportCommand(BaseCommand):
         else:
             print(output)
 
+    def _export_split(
+        self,
+        parser: JSONParser,
+        field_selector: FieldSelector,
+        metadata_selector: Optional[MetadataSelector],
+        formatter,
+    ):
+        """Export conversations with splitting into directory structure.
+
+        Args:
+            parser: JSONParser instance.
+            field_selector: FieldSelector instance.
+            metadata_selector: Optional MetadataSelector instance.
+            formatter: Formatter instance.
+        """
+        # Create split processor
+        self.logger.debug(f"Creating SplitProcessor with mode: {self.split_mode.value}")
+        split_processor = SplitProcessor(parser, mode=self.split_mode)
+
+        # Process and split conversations
+        split_result = split_processor.process()
+        self.logger.info(
+            f"Split into {split_result.group_count} groups "
+            f"({split_result.total_conversations} total conversations)"
+        )
+
+        # Apply field and metadata filtering to each group
+        filtered_groups: dict = {}
+        for group_key, conversations in split_result.groups.items():
+            filtered_convs = []
+            for conv in conversations:
+                filtered_conv = field_selector.filter_conversation(conv)
+                if metadata_selector:
+                    filtered_conv = metadata_selector.filter_metadata(filtered_conv)
+                filtered_convs.append(filtered_conv)
+            filtered_groups[group_key] = filtered_convs
+
+        # Create output writer and write files
+        self.logger.debug(f"Creating OutputWriter for directory: {self.output_dir}")
+        output_writer = OutputWriter(
+            output_dir=self.output_dir,
+            format_type=self.format_type,
+            split_mode=self.split_mode,
+        )
+
+        write_result = output_writer.write_conversations(filtered_groups, formatter)
+
+        self.logger.info(
+            f"Wrote {write_result.files_written} files "
+            f"({write_result.total_bytes} bytes)"
+        )
+        print(f"Exported {write_result.files_written} files to {self.output_dir}/")
+
+        if write_result.errors:
+            self.logger.warning(f"{len(write_result.errors)} errors occurred")
+            for error in write_result.errors:
+                self.logger.error(error)
+
 
 def export_command(args: argparse.Namespace) -> int:
     """Entry point for the export subcommand.
@@ -123,7 +210,9 @@ def export_command(args: argparse.Namespace) -> int:
     command = ExportCommand(
         filepath=args.file,
         format_type=args.format,
-        output_file=args.output,
+        output_file=getattr(args, "output", None),
+        output_dir=getattr(args, "output_dir", None),
+        split_mode=getattr(args, "split", "single"),
         fields=args.fields,
         include=getattr(args, "include", None),
         exclude=getattr(args, "exclude", None),
@@ -148,10 +237,20 @@ def add_export_parser(subparsers) -> argparse.ArgumentParser:
         description=(
             "Export ChatGPT conversations to txt or json format.\n\n"
             "Select which fields to include/exclude using --fields or\n"
-            "filter by metadata using --include/--exclude options."
+            "filter by metadata using --include/--exclude options.\n"
+            "Use --split to organize output into directories."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+Split Modes:
+  single   - All conversations to one file (default, backward compatible)
+  subject  - Each conversation to its own file (named by title)
+  date     - Group conversations by creation date (daily folders)
+
+Output Options:
+  -o, --output FILE     - Write single file output to FILE (for --split single)
+  --output-dir DIR     - Write split output to directory DIR (default: ./output)
+
 Field Groups (for --fields groups):
   conversation  - _id, conversation_id, create_time, update_time, title, type
   message      - author, content, status, end_turn
@@ -163,13 +262,20 @@ Metadata Fields (for --include/--exclude):
   plugin_ids, conversation_id, type, moderation_results, current_node, is_archived
 
 Examples:
+  # Single file output (backward compatible)
   chatgpt-export export data.json
   chatgpt-export export data.json --format txt --output conversations.txt
   chatgpt-export export data.json --format json --output conversations.json
-  chatgpt-export export data.json --fields groups minimal
-  chatgpt-export export data.json --fields include title,create_time
-  chatgpt-export export data.json --fields exclude model_slug,plugin_ids
-  chatgpt-export export data.json --include title model_slug --output filtered.txt
+
+  # Split by subject (each conversation = own file)
+  chatgpt-export export data.json --split subject --output-dir ./exports
+
+  # Split by date (daily folders)
+  chatgpt-export export data.json --split date --output-dir ./exports
+  # Creates: ./exports/2024-03-20/conversation_title.txt
+
+  # With field selection
+  chatgpt-export export data.json --split subject --fields groups minimal --output-dir ./exports
         """,
     )
 
@@ -213,11 +319,29 @@ Examples:
         help="Exclude these metadata fields from export",
     )
 
+    # Split mode argument
     export_parser.add_argument(
+        "--split",
+        "-s",
+        choices=["single", "subject", "date"],
+        default="single",
+        help="Split mode: 'single' (default), 'subject' (one file per conversation), 'date' (daily folders)",
+    )
+
+    # Output options
+    output_group = export_parser.add_mutually_exclusive_group()
+
+    output_group.add_argument(
         "-o",
         "--output",
-        metavar="PATH",
-        help="Write output to file instead of stdout",
+        metavar="FILE",
+        help="Write output to file (for single file mode)",
+    )
+
+    output_group.add_argument(
+        "--output-dir",
+        metavar="DIR",
+        help="Output directory for split mode (default: ./output)",
     )
 
     export_parser.add_argument(
