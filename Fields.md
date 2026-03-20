@@ -412,6 +412,67 @@ The following patterns indicate internal or experimental fields:
 - UUIDs follow the format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
 - MongoDB ObjectIds follow the format: `xxxxxxxxxxxxxxxxxxxxxxxx`
 
+## Metadata Field Filtering (--include / --exclude)
+
+The `analyze` and `export` commands support filtering metadata fields using `--include` and `--exclude` options. These options are **mutually exclusive** with `--fields`.
+
+### Available Metadata Fields
+
+The following fields can be used with `--include` or `--exclude`:
+
+| Field | Description |
+|-------|-------------|
+| `id` | Conversation ID |
+| `title` | Conversation title |
+| `create_time` | Creation timestamp |
+| `update_time` | Last update timestamp |
+| `model_slug` | Model identifier |
+| `message_type` | Message type indicator |
+| `plugin_ids` | List of plugin IDs used |
+| `conversation_id` | Conversation UUID |
+| `type` | Conversation type |
+| `moderation_results` | Moderation check results |
+| `current_node` | Current node in conversation tree |
+| `is_archived` | Archive status |
+
+### Matching Patterns
+
+The metadata filtering supports multiple matching strategies:
+
+| Pattern Type | Example | Matches |
+|--------------|---------|---------|
+| Exact match | `title` | `title` |
+| Partial match | `time` | `create_time`, `update_time` |
+| Glob pattern | `model*` | `model_slug` |
+| Wildcard (`*`) | `*` | All metadata fields |
+
+### Usage Examples
+
+```bash
+# Include only specific metadata fields
+chatgpt export input.json --include title create_time model_slug
+
+# Exclude specific metadata fields
+chatgpt export input.json --exclude plugin_ids moderation_results
+
+# Include all metadata fields (equivalent to default behavior)
+chatgpt export input.json --include "*"
+
+# Use with other options
+chatgpt export input.json --include "title" "create_time" --format json -o output.json
+
+# Analyze with filtered metadata
+chatgpt analyze input.json --exclude is_archived
+```
+
+### Mutual Exclusivity
+
+The `--include` and `--exclude` options:
+- **Cannot** be used together
+- **Cannot** be used with `--fields`
+
+Using `--fields` with `--include` or `--exclude` will result in an error.
+
 ## See Also
 
-- [3ae/conversations.json](./3ae/conversations.json) - Source data file
+- [README.md](README.md) - Tool usage and command documentation

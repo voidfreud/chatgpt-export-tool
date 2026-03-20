@@ -4,39 +4,10 @@ JSON parsing module for ChatGPT conversations.
 Handles memory-efficient streaming parsing of large JSON files using ijson.
 """
 
-import os
-from typing import Dict, Any, Set, Optional
+import ijson
+from typing import Dict, Any, Set
 
-
-def get_file_size(filepath: str) -> int:
-    """Get file size in bytes.
-    
-    Args:
-        filepath: Path to the file.
-        
-    Returns:
-        File size in bytes.
-        
-    Raises:
-        OSError: If the file cannot be accessed.
-    """
-    return os.path.getsize(filepath)
-
-
-def format_size(size_bytes: int) -> str:
-    """Format bytes to human-readable string.
-    
-    Args:
-        size_bytes: Size in bytes.
-        
-    Returns:
-        Human-readable size string (e.g., "1.23 MB").
-    """
-    for unit in ['B', 'KB', 'MB', 'GB']:
-        if size_bytes < 1024:
-            return f"{size_bytes:.2f} {unit}"
-        size_bytes /= 1024.0
-    return f"{size_bytes:.2f} TB"
+from chatgpt_export_tool.core.utils import get_file_size, format_size
 
 
 class JSONParser:
@@ -53,16 +24,6 @@ class JSONParser:
             filepath: Path to the JSON file to parse.
         """
         self.filepath = filepath
-        self._ensure_ijson()
-    
-    @staticmethod
-    def _ensure_ijson():
-        """Ensure ijson is installed, install if needed."""
-        try:
-            import ijson
-        except ImportError:
-            import subprocess
-            subprocess.check_call(["uv", "pip", "install", "ijson"])
     
     def analyze(self, verbose: bool = False) -> Dict[str, Any]:
         """Analyze JSON file structure.
@@ -77,8 +38,6 @@ class JSONParser:
             - all_fields: Set of all unique field names
             - sample_conversation: Sample structure from first conversation
         """
-        import ijson
-        
         results: Dict[str, Any] = {
             'conversation_count': 0,
             'message_count': 0,
@@ -130,27 +89,9 @@ class JSONParser:
         Yields:
             Each conversation dictionary.
         """
-        import ijson
-        
         with open(self.filepath, 'rb') as f:
             conversations = ijson.items(f, 'item')
             for idx, conv in enumerate(conversations):
                 if verbose and (idx + 1) % 100 == 0:
                     print(f"  Processed {idx + 1} conversations...")
                 yield conv
-    
-    def get_conversations(self, limit: Optional[int] = None) -> list:
-        """Get conversations from the JSON file.
-        
-        Args:
-            limit: Maximum number of conversations to retrieve.
-            
-        Returns:
-            List of conversation dictionaries.
-        """
-        conversations = []
-        for conv in self.iterate_conversations():
-            conversations.append(conv)
-            if limit and len(conversations) >= limit:
-                break
-        return conversations

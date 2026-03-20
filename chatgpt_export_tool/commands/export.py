@@ -5,13 +5,15 @@ Exports ChatGPT conversations to various formats (txt, json).
 """
 
 import argparse
-import os
 import sys
-from typing import Optional
+from typing import Optional, List
 
 from chatgpt_export_tool.core.parser import JSONParser
-from chatgpt_export_tool.core.field_config import FieldSelector
+from chatgpt_export_tool.core.field_config import FieldSelector, MetadataSelector
 from chatgpt_export_tool.core.formatters import get_formatter
+from chatgpt_export_tool.core.utils import (
+    validate_file, setup_logging, get_logger
+)
 
 
 class ExportCommand:
@@ -19,7 +21,9 @@ class ExportCommand:
     
     def __init__(self, filepath: str, format_type: str = "txt",
                  output_file: Optional[str] = None, fields: str = "all",
-                 verbose: bool = False):
+                 include: Optional[List[str]] = None, 
+                 exclude: Optional[List[str]] = None,
+                 verbose: bool = False, debug: bool = False):
         """Initialize export command.
         
         Args:
@@ -27,13 +31,21 @@ class ExportCommand:
             format_type: Output format ('txt' or 'json').
             output_file: Optional path to write output to.
             fields: Field selection mode.
-            verbose: If True, print progress information.
+            include: Metadata fields to include.
+            exclude: Metadata fields to exclude.
+            verbose: If True, enable verbose (INFO) logging.
+            debug: If True, enable debug logging.
         """
         self.filepath = filepath
         self.format_type = format_type
         self.output_file = output_file
         self.fields = fields
-        self.verbose = verbose
+        self.include = include
+        self.exclude = exclude
+        
+        # Setup logging
+        setup_logging(verbose=verbose, debug=debug)
+        self.logger = get_logger()
     
     def run(self) -> int:
         """Execute the export command.
@@ -42,56 +54,82 @@ class ExportCommand:
             Exit code (0 for success, 1 for error).
         """
         try:
-            self._validate_file()
+            self.logger.info(f"Exporting file: {self.filepath}")
+            validate_file(self.filepath)
             self._export()
             return 0
         except FileNotFoundError as e:
+            self.logger.error(f"File not found: {e}")
             print(f"Error: {e}", file=sys.stderr)
             return 1
         except PermissionError as e:
+            self.logger.error(f"Permission denied: {e}")
             print(f"Error: Permission denied - {e}", file=sys.stderr)
             return 1
         except KeyboardInterrupt:
+            self.logger.info("Operation cancelled by user")
             print("\nOperation cancelled by user.", file=sys.stderr)
             return 130
         except Exception as e:
+            self.logger.error(f"Unexpected error: {e}")
+            self.logger.debug(f"Traceback:", exc_info=True)
             print(f"Error: Unexpected error - {e}", file=sys.stderr)
-            if self.verbose:
+            if self.logger.level <= 10:  # DEBUG
                 import traceback
                 traceback.print_exc()
             return 1
     
-    def _validate_file(self):
-        """Validate that the file exists and is accessible."""
-        if not os.path.exists(self.filepath):
-            raise FileNotFoundError(f"File not found: {self.filepath}")
-    
     def _export(self):
         """Export conversations to the specified format."""
+        self.logger.debug(f"Creating field selector with mode: {self.fields}")
         # Create field selector
         field_selector = FieldSelector.from_string(self.fields)
         
+        # Create metadata selector if include/exclude provided
+        metadata_selector = None
+        if self.include or self.exclude:
+            self.logger.debug(f"Creating metadata selector: include={self.include}, exclude={self.exclude}")
+            metadata_selector = MetadataSelector.from_args(
+                include=self.include, exclude=self.exclude
+            )
+            included = metadata_selector.get_included_fields()
+            excluded = metadata_selector.get_excluded_fields()
+            self.logger.info(f"Metadata filtering: including={included if included else 'all'}, excluding={excluded if excluded else 'none'}")
+        
+        self.logger.debug(f"Creating formatter for type: {self.format_type}")
         # Create formatter
         formatter = get_formatter(self.format_type)
         
         # Parse and export
+        self.logger.debug(f"Parsing file: {self.filepath}")
         parser = JSONParser(self.filepath)
         
-        if self.verbose:
+        if self.logger.level <= 20:  # INFO
             print(f"Exporting {self.filepath} to {self.format_type} format...")
         
+        self.logger.info(f"Starting export to {self.format_type} format")
+        
         conversations = []
-        for conv in parser.iterate_conversations(verbose=self.verbose):
+        for conv in parser.iterate_conversations(verbose=self.logger.level <= 20):
             # Apply field filtering
             filtered_conv = field_selector.filter_conversation(conv)
+            
+            # Apply metadata filtering if metadata selector is configured
+            if metadata_selector:
+                filtered_conv = metadata_selector.filter_metadata(filtered_conv)
+                self.logger.debug(f"Metadata filtering applied to conversation")
+            
             formatted = formatter.format_conversation(filtered_conv, field_selector)
             conversations.append(formatted)
+        
+        self.logger.info(f"Exported {len(conversations)} conversations")
         
         output = "\n".join(conversations)
         
         if self.output_file:
             with open(self.output_file, 'w') as f:
                 f.write(output)
+            self.logger.info(f"Output written to: {self.output_file}")
             print(f"Output written to: {self.output_file}")
         else:
             print(output)
@@ -111,7 +149,10 @@ def export_command(args: argparse.Namespace) -> int:
         format_type=args.format,
         output_file=args.output,
         fields=args.fields,
-        verbose=args.verbose
+        include=getattr(args, 'include', None),
+        exclude=getattr(args, 'exclude', None),
+        verbose=args.verbose,
+        debug=args.debug
     )
     return command.run()
 
@@ -142,10 +183,27 @@ def add_export_parser(subparsers) -> argparse.ArgumentParser:
         help="Output format (default: txt)"
     )
     
-    export_parser.add_argument(
+    # Create a mutually exclusive group for --fields vs --include/--exclude
+    field_group = export_parser.add_mutually_exclusive_group()
+    
+    field_group.add_argument(
         "--fields", "-f",
         default="all",
         help="Field selection mode: all, none, include <fields>, exclude <fields>, groups <groups>"
+    )
+    
+    field_group.add_argument(
+        "--include",
+        nargs='+',
+        metavar="FIELD",
+        help="Metadata fields to include (use '*' for all, or specific field names)"
+    )
+    
+    field_group.add_argument(
+        "--exclude",
+        nargs='+',
+        metavar="FIELD",
+        help="Metadata fields to exclude (use '*' for all, or specific field names)"
     )
     
     export_parser.add_argument(
@@ -158,6 +216,12 @@ def add_export_parser(subparsers) -> argparse.ArgumentParser:
         "-v", "--verbose",
         action="store_true",
         help="Enable verbose output with progress information"
+    )
+    
+    export_parser.add_argument(
+        "-d", "--debug",
+        action="store_true",
+        help="Enable debug output with detailed logging"
     )
     
     return export_parser

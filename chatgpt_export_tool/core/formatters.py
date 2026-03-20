@@ -8,6 +8,8 @@ import json
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional
 
+from chatgpt_export_tool.core.field_config import FieldSelector
+
 
 class BaseFormatter(ABC):
     """Abstract base class for output formatters."""
@@ -97,7 +99,6 @@ class TextFormatter(BaseFormatter):
             lines.append("")
             
             # Categorize and display fields
-            from chatgpt_export_tool.core.field_config import FieldSelector
             categorized = FieldSelector.categorize_fields(results['all_fields'])
             
             for category, fields in categorized.items():

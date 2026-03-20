@@ -5,37 +5,44 @@ Analyzes the structure of ChatGPT conversations.json export files.
 """
 
 import argparse
-import os
 import sys
-from typing import Dict, Any, Optional
+from typing import Optional, List
 
-from chatgpt_export_tool.core.parser import JSONParser, get_file_size, format_size
-from chatgpt_export_tool.core.field_config import FieldSelector
-
-# Import ijson for error handling
-try:
-    import ijson
-except ImportError:
-    ijson = None
+from chatgpt_export_tool.core.parser import JSONParser
+from chatgpt_export_tool.core.field_config import FieldSelector, MetadataSelector
+from chatgpt_export_tool.core.utils import (
+    validate_file, get_file_size, format_size, 
+    setup_logging, get_logger
+)
 
 
 class AnalyzeCommand:
     """Command for analyzing JSON file structure."""
     
     def __init__(self, filepath: str, output_file: Optional[str] = None, 
-                 verbose: bool = False, fields: str = "all"):
+                 verbose: bool = False, debug: bool = False, fields: str = "all",
+                 include: Optional[List[str]] = None,
+                 exclude: Optional[List[str]] = None):
         """Initialize analyze command.
         
         Args:
             filepath: Path to the JSON file to analyze.
             output_file: Optional path to write output to.
-            verbose: If True, print progress information.
+            verbose: If True, enable verbose (INFO) logging.
+            debug: If True, enable debug logging.
             fields: Field selection mode (default: "all").
+            include: Metadata fields to include.
+            exclude: Metadata fields to exclude.
         """
         self.filepath = filepath
         self.output_file = output_file
-        self.verbose = verbose
         self.fields = fields
+        self.include = include
+        self.exclude = exclude
+        
+        # Setup logging
+        setup_logging(verbose=verbose, debug=debug)
+        self.logger = get_logger()
     
     def run(self) -> int:
         """Execute the analyze command.
@@ -44,35 +51,38 @@ class AnalyzeCommand:
             Exit code (0 for success, 1 for error).
         """
         try:
-            self._validate_file()
+            self.logger.info(f"Analyzing file: {self.filepath}")
+            validate_file(self.filepath)
             self._print_analysis()
             return 0
         except FileNotFoundError as e:
+            self.logger.error(f"File not found: {e}")
             print(f"Error: {e}", file=sys.stderr)
             return 1
-        except (ijson.JSONError if ijson else Exception) as e:
+        except ijson.JSONError as e:
+            self.logger.error(f"Invalid JSON file: {e}")
             print(f"Error: Invalid JSON file - {e}", file=sys.stderr)
             return 1
         except PermissionError as e:
+            self.logger.error(f"Permission denied: {e}")
             print(f"Error: Permission denied - {e}", file=sys.stderr)
             return 1
         except KeyboardInterrupt:
+            self.logger.info("Operation cancelled by user")
             print("\nOperation cancelled by user.", file=sys.stderr)
             return 130
         except Exception as e:
+            self.logger.error(f"Unexpected error: {e}")
+            self.logger.debug(f"Traceback:", exc_info=True)
             print(f"Error: Unexpected error - {e}", file=sys.stderr)
-            if self.verbose:
+            if self.logger.level <= 10:  # DEBUG
                 import traceback
                 traceback.print_exc()
             return 1
     
-    def _validate_file(self):
-        """Validate that the file exists and is accessible."""
-        if not os.path.exists(self.filepath):
-            raise FileNotFoundError(f"File not found: {self.filepath}")
-    
     def _print_analysis(self):
         """Print the analysis results."""
+        self.logger.debug(f"Getting file size for: {self.filepath}")
         file_size = get_file_size(self.filepath)
         
         output_lines = []
@@ -80,14 +90,15 @@ class AnalyzeCommand:
         output_lines.append(f"Size: {format_size(file_size)} ({file_size:,} bytes)")
         output_lines.append("")
         
-        if self.verbose:
+        if self.logger.level <= 20:  # INFO
             output_lines.append("Analyzing structure (this may take a moment for large files)...")
             output_lines.append("Using streaming JSON parsing (ijson)...")
             output_lines.append("")
         
+        self.logger.info("Starting JSON analysis")
         # Run the analysis
         parser = JSONParser(self.filepath)
-        results = parser.analyze(verbose=self.verbose)
+        results = parser.analyze(verbose=self.logger.level <= 20)
         
         output_lines.append("=" * 60)
         output_lines.append("ANALYSIS RESULTS")
@@ -97,6 +108,10 @@ class AnalyzeCommand:
         output_lines.append(f"Number of threads/conversations: {results['conversation_count']:,}")
         output_lines.append(f"Total message nodes in mappings: {results['message_count']:,}")
         output_lines.append("")
+        
+        self.logger.info(f"Found {results['conversation_count']:,} conversations")
+        self.logger.info(f"Found {results['message_count']:,} total messages")
+        
         output_lines.append("-" * 60)
         output_lines.append("ALL UNIQUE FIELD NAMES FOUND:")
         output_lines.append("-" * 60)
@@ -106,6 +121,7 @@ class AnalyzeCommand:
         output_lines.append("")
         
         # Categorize and display fields
+        self.logger.debug("Categorizing fields by hierarchy level")
         categorized = FieldSelector.categorize_fields(results['all_fields'])
         
         for category, fields in categorized.items():
@@ -126,6 +142,7 @@ class AnalyzeCommand:
         if self.output_file:
             with open(self.output_file, 'w') as f:
                 f.write(output)
+            self.logger.info(f"Output written to: {self.output_file}")
             print(f"Output written to: {self.output_file}")
         else:
             print(output)
@@ -144,7 +161,10 @@ def analyze_command(args: argparse.Namespace) -> int:
         filepath=args.file,
         output_file=args.output,
         verbose=args.verbose,
-        fields=args.fields
+        debug=args.debug,
+        fields=args.fields,
+        include=getattr(args, 'include', None),
+        exclude=getattr(args, 'exclude', None)
     )
     return command.run()
 
@@ -168,10 +188,27 @@ def add_analyze_parser(subparsers) -> argparse.ArgumentParser:
         help="Path to the JSON file to analyze"
     )
     
-    analyze_parser.add_argument(
+    # Create a mutually exclusive group for --fields vs --include/--exclude
+    field_group = analyze_parser.add_mutually_exclusive_group()
+    
+    field_group.add_argument(
         "--fields", "-f",
         default="all",
         help="Field selection mode: all, none, include <fields>, exclude <fields>, groups <groups>"
+    )
+    
+    field_group.add_argument(
+        "--include",
+        nargs='+',
+        metavar="FIELD",
+        help="Metadata fields to include (use '*' for all, or specific field names)"
+    )
+    
+    field_group.add_argument(
+        "--exclude",
+        nargs='+',
+        metavar="FIELD",
+        help="Metadata fields to exclude (use '*' for all, or specific field names)"
     )
     
     analyze_parser.add_argument(
@@ -186,4 +223,17 @@ def add_analyze_parser(subparsers) -> argparse.ArgumentParser:
         help="Enable verbose output with progress information"
     )
     
+    analyze_parser.add_argument(
+        "-d", "--debug",
+        action="store_true",
+        help="Enable debug output with detailed logging"
+    )
+    
     return analyze_parser
+
+
+# Import ijson at module level for error handling
+try:
+    import ijson
+except ImportError:
+    ijson = None

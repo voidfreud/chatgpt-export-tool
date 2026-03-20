@@ -7,10 +7,6 @@ ChatGPT conversations from JSON export files.
 
 import argparse
 import sys
-import os
-
-# Add the parent directory to path for local development
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from chatgpt_export_tool.commands.analyze import add_analyze_parser, analyze_command
 from chatgpt_export_tool.commands.export import add_export_parser, export_command
@@ -30,6 +26,7 @@ def create_parser() -> argparse.ArgumentParser:
 Examples:
   chatgpt-export analyze data.json
   chatgpt-export analyze data.json --verbose
+  chatgpt-export analyze data.json --debug
   chatgpt-export analyze data.json --output results.txt
   chatgpt-export analyze data.json --fields include title,create_time
   chatgpt-export analyze data.json --fields exclude model_slug,plugin_ids

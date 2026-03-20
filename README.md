@@ -8,7 +8,7 @@ A Python tool for exporting and analyzing ChatGPT `conversations.json` export fi
 
 ## Overview
 
-The [`analyze_json.py`](analyze_json.py) script parses ChatGPT conversation exports and reports:
+The `chatgpt-export` CLI tool parses ChatGPT conversation exports and reports:
 
 - Total number of conversations/threads
 - Total message count across all conversations
@@ -42,33 +42,26 @@ uv pip install -e .
 ### Command Line
 
 ```bash
-# Analyze the default file (3ae/conversations.json)
-uv run analyze-json
-
 # Analyze a specific file
-uv run analyze-json path/to/conversations.json
+chatgpt-export analyze path/to/conversations.json
 
 # With verbose output
-uv run analyze-json --verbose path/to/conversations.json
+chatgpt-export analyze path/to/conversations.json --verbose
+
+# With debug output for detailed logging
+chatgpt-export analyze path/to/conversations.json --debug
 
 # Write output to a file
-uv run analyze-json --output results.txt path/to/conversations.json
+chatgpt-export analyze path/to/conversations.json --output results.txt
 
-# Using the installed CLI command
-analyze-json path/to/conversations.json --verbose --output results.txt
-```
+# Export conversations to text format
+chatgpt-export export path/to/conversations.json --format txt
 
-### Python API
+# Export conversations to JSON format
+chatgpt-export export path/to/conversations.json --format json --output data.json
 
-```python
-from analyze_json import analyze_with_full_iteration
-
-# Analyze a file
-results = analyze_with_full_iteration('path/to/conversations.json')
-
-print(f"Conversations: {results['conversation_count']}")
-print(f"Messages: {results['message_count']}")
-print(f"Fields: {len(results['all_fields'])}")
+# Using uv run
+uv run chatgpt-export analyze path/to/conversations.json --verbose
 ```
 
 ## Output
@@ -111,7 +104,20 @@ The script organizes fields into these hierarchical levels:
 ├── LICENSE
 ├── README.md
 ├── pyproject.toml
-├── analyze_json.py      # Main analysis script
+├── chatgpt_export_tool/
+│   ├── __init__.py
+│   ├── cli.py
+│   ├── commands/
+│   │   ├── __init__.py
+│   │   ├── analyze.py
+│   │   └── export.py
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── field_config.py
+│   │   ├── formatters.py
+│   │   ├── parser.py
+│   │   └── utils.py
+│   └── data/
 ├── tests/
 │   └── test_analyze_json.py  # Test suite
 └── Fields.md            # Field reference documentation
@@ -126,7 +132,7 @@ The script organizes fields into these hierarchical levels:
 uv run pytest
 
 # Run tests with coverage
-uv run pytest --cov=analyze_json --cov-report=html
+uv run pytest --cov=chatgpt_export_tool --cov-report=html
 
 # Run specific test file
 uv run pytest tests/test_analyze_json.py -v
