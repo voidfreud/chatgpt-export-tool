@@ -19,12 +19,14 @@ class TestSplitMode:
         assert SplitMode.SINGLE.value == "single"
         assert SplitMode.SUBJECT.value == "subject"
         assert SplitMode.DATE.value == "date"
+        assert SplitMode.ID.value == "id"
 
     def test_split_mode_from_string(self):
         """Test creating SplitMode from string."""
         assert SplitMode("single") == SplitMode.SINGLE
         assert SplitMode("subject") == SplitMode.SUBJECT
         assert SplitMode("date") == SplitMode.DATE
+        assert SplitMode("id") == SplitMode.ID
 
 
 class TestSplitResult:
@@ -149,6 +151,36 @@ class TestSplitProcessor:
 
         assert key == "unknown_date"
 
+    def test_get_group_key_id(self):
+        """Test _get_group_key returns ID for ID mode."""
+        mock_parser = MagicMock()
+        processor = SplitProcessor(mock_parser, mode=SplitMode.ID)
+
+        conv = {"title": "Test", "id": "abc123"}
+        key = processor._get_group_key(conv)
+
+        assert key == "abc123"
+
+    def test_get_group_key_id_fallback_to__id(self):
+        """Test _get_group_key falls back to _id when id is not present."""
+        mock_parser = MagicMock()
+        processor = SplitProcessor(mock_parser, mode=SplitMode.ID)
+
+        conv = {"title": "Test", "_id": "xyz789"}
+        key = processor._get_group_key(conv)
+
+        assert key == "xyz789"
+
+    def test_get_group_key_id_no_id_field(self):
+        """Test _get_group_key returns 'unknown_id' when no id field."""
+        mock_parser = MagicMock()
+        processor = SplitProcessor(mock_parser, mode=SplitMode.ID)
+
+        conv = {"title": "Test"}
+        key = processor._get_group_key(conv)
+
+        assert key == "unknown_id"
+
     def test_process_single_mode(self):
         """Test process with SINGLE mode returns single group."""
         mock_parser = MagicMock()
@@ -207,6 +239,26 @@ class TestSplitProcessor:
         assert result.total_conversations == 3
         assert len(result.groups["2024-03-01"]) == 2
         assert len(result.groups["2024-03-02"]) == 1
+
+    def test_process_id_mode_groups_by_id(self):
+        """Test process with ID mode groups conversations by ID."""
+        mock_parser = MagicMock()
+        mock_parser.iterate_conversations.return_value = iter(
+            [
+                {"title": "Conv 1", "id": "id1"},
+                {"title": "Conv 2", "id": "id2"},
+                {"title": "Conv 3", "id": "id1"},
+            ]
+        )
+        processor = SplitProcessor(mock_parser, mode=SplitMode.ID)
+
+        result = processor.process()
+
+        assert result.mode == SplitMode.ID
+        assert result.group_count == 2
+        assert result.total_conversations == 3
+        assert len(result.groups["id1"]) == 2
+        assert len(result.groups["id2"]) == 1
 
 
 class TestSplitProcessorEdgeCases:

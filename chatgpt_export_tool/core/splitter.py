@@ -24,11 +24,13 @@ class SplitMode(Enum):
         SINGLE: All conversations to one file (backward compatible).
         SUBJECT: Each conversation to its own file.
         DATE: Group conversations by creation date (daily folders).
+        ID: Group conversations by their ID field.
     """
 
     SINGLE = "single"
     SUBJECT = "subject"
     DATE = "date"
+    ID = "id"
 
 
 @dataclass
@@ -143,6 +145,14 @@ class SplitProcessor:
                 except (ValueError, OSError) as e:
                     logger.warning(f"Could not parse create_time {create_time}: {e}")
             return "unknown_date"
+
+        elif self.mode == SplitMode.ID:
+            # Group by conversation ID
+            conv_id = conv.get("id", conv.get("_id"))
+            if conv_id is not None:
+                return str(conv_id)
+            logger.warning("Conversation has no ID field, using 'unknown_id'")
+            return "unknown_id"
 
         return "all"
 
