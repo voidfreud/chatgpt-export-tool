@@ -74,6 +74,9 @@ class AnalyzeCommand(BaseCommand):
         parser = JSONParser(self.filepath)
         results = parser.analyze(verbose=self.logger.level <= 20)
 
+        # Add file size to results for analysis output
+        results["file_size"] = format_size(file_size)
+
         self.logger.info(f"Found {results['conversation_count']:,} conversations")
         self.logger.info(f"Found {results['message_count']:,} total messages")
 
