@@ -29,4 +29,3 @@ def test_analysis_collector_tracks_nested_message_fields() -> None:
     assert {"title", "mapping", "message", "role", "parts", "model_slug"} <= results[
         "all_fields"
     ]
-    assert results["sample_conversation"]["mapping_size"] == 1

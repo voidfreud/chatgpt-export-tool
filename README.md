@@ -174,7 +174,7 @@ Currently supported metadata names include:
 `export` supports four split modes:
 
 - `single`: one combined output stream or one output file
-- `subject`: one file per conversation, named from title
+- `subject`: one file per conversation, named from title plus identifier
 - `date`: date folders with one file per conversation
 - `id`: one file per conversation, named from conversation ID
 
@@ -214,6 +214,7 @@ Run the checks used during refactoring:
 
 ```bash
 uv run pytest
+uv run pytest --cov=chatgpt_export_tool --cov-report=term-missing
 uv run ruff check chatgpt_export_tool tests pyproject.toml
 uv run ruff format --check chatgpt_export_tool tests
 ```
@@ -227,6 +228,6 @@ uv run ruff format chatgpt_export_tool tests
 ## Notes
 
 - Input handling is streaming, so large exports do not need to be loaded into memory just to analyze or iterate conversations.
-- Single-output export currently builds the combined formatted output in memory before writing or printing it.
+- Single-file JSON export writes one valid JSON document.
 - Split exports write one conversation per output file.
 - The field-selection and metadata-selection surface is documented in [Fields.md](Fields.md).

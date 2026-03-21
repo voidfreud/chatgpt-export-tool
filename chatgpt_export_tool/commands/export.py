@@ -66,11 +66,15 @@ class ExportCommand(BaseCommand):
             return
 
         if result.write_result is not None and result.output_dir is not None:
+            for error in result.write_result.errors:
+                self.logger.error(error)
+            if result.write_result.errors:
+                raise RuntimeError(
+                    f"Encountered {len(result.write_result.errors)} export write errors"
+                )
             print(
                 f"Exported {result.write_result.files_written} files to {result.output_dir}/"
             )
-            for error in result.write_result.errors:
-                self.logger.error(error)
 
 
 def export_command(args: argparse.Namespace) -> int:

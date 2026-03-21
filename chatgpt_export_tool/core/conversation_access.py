@@ -47,6 +47,18 @@ def get_subject_group_key(conversation: Dict[str, Any]) -> str:
     return f"{get_conversation_title(conversation)}_{identifier}"
 
 
+def get_subject_filename_stem(conversation: Dict[str, Any]) -> str:
+    """Return the filename stem for subject-based exports.
+
+    Args:
+        conversation: Conversation dictionary.
+
+    Returns:
+        Stable filename stem based on title and identifier.
+    """
+    return get_subject_group_key(conversation)
+
+
 def get_id_group_key(conversation: Dict[str, Any]) -> str:
     """Return the split key for ID-based exports.
 

@@ -189,7 +189,7 @@ class TestFieldValidator:
     def test_find_similar_fields(self):
         """Test finding similar fields."""
         validator = FieldValidator()
-        similar = validator._find_similar_fields("titel", max_results=3)
+        similar = validator.find_similar_fields("titel", max_results=3)
         # Should find "title"
         assert "title" in similar
 
@@ -214,6 +214,12 @@ class TestModuleFunctions:
         """Test validating known metadata pattern."""
         result = validate_metadata_pattern("title")
         assert result.is_valid is True
+
+    def test_validate_metadata_pattern_wildcard(self):
+        """Wildcard metadata patterns should validate when runtime accepts them."""
+        result = validate_metadata_pattern("model*")
+        assert result.is_valid is True
+        assert result.warnings == []
 
     def test_validate_metadata_pattern_unknown(self):
         """Test validating unknown metadata pattern."""

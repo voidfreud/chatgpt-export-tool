@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, Iterable, List, Optional, Set
 
 from chatgpt_export_tool.core.conversation_formatters import BaseFormatter
 from chatgpt_export_tool.core.file_naming import FileNamer
@@ -43,6 +43,15 @@ class WriteResult:
         self.errors.extend(other.errors)
 
 
+@dataclass(frozen=True)
+class WriteJob:
+    """One resolved conversation write request."""
+
+    source_conversation: Dict[str, Any]
+    rendered_conversation: Dict[str, Any]
+    group_key: str
+
+
 class OutputWriter:
     """Write formatted conversations to disk."""
 
@@ -70,6 +79,41 @@ class OutputWriter:
             file_namer=self.file_namer,
         )
 
+    def write_jobs(
+        self,
+        jobs: Iterable[WriteJob],
+        formatter: BaseFormatter,
+    ) -> WriteResult:
+        """Write a stream of pre-resolved jobs to disk."""
+        result = WriteResult()
+        used_paths: Set[Path] = set()
+        ensured_directories: Set[Path] = set()
+
+        for job in jobs:
+            try:
+                filepath = self._get_unique_filepath(
+                    job.source_conversation,
+                    job.group_key,
+                    used_paths,
+                )
+                if self._ensure_directory(filepath.parent, ensured_directories):
+                    result.directories_created += 1
+                bytes_written = self._write_single(
+                    job.rendered_conversation,
+                    filepath,
+                    formatter,
+                )
+                used_paths.add(filepath)
+                result.files_written += 1
+                result.total_bytes += bytes_written
+            except Exception as exc:
+                result.add_error(
+                    "Error writing conversation "
+                    f"'{job.source_conversation.get('title', 'N/A')}': {exc}"
+                )
+
+        return result
+
     def write_conversations(
         self,
         groups: Dict[str, List[Dict[str, Any]]],
@@ -84,58 +128,16 @@ class OutputWriter:
         Returns:
             Aggregate write result.
         """
-        result = WriteResult()
-        used_paths: Set[Path] = set()
-
-        if self._ensure_directory(self.output_dir):
-            result.directories_created += 1
-
-        for group_key, conversations in groups.items():
-            for conversation in conversations:
-                try:
-                    filepath = self._get_unique_filepath(
-                        conversation, group_key, used_paths
-                    )
-                    bytes_written = self._write_single(
-                        conversation, filepath, formatter
-                    )
-                    used_paths.add(filepath)
-                    result.files_written += 1
-                    result.total_bytes += bytes_written
-                except Exception as exc:
-                    result.add_error(
-                        f"Error writing conversation '{conversation.get('title', 'N/A')}': {exc}"
-                    )
-
-        return result
-
-    def _get_filepath(self, conv: Dict[str, Any], group_key: str) -> Path:
-        """Build the target filepath for one conversation.
-
-        Args:
-            conv: Conversation dictionary.
-            group_key: Resolved group key.
-
-        Returns:
-            Target path.
-        """
-        return self.path_resolver.get_filepath(conv, group_key)
-
-    def _resolve_target_location(
-        self,
-        conv: Dict[str, Any],
-        group_key: str,
-    ) -> tuple[Path, str]:
-        """Resolve the destination directory and filename stem.
-
-        Args:
-            conv: Conversation dictionary.
-            group_key: Resolved group key.
-
-        Returns:
-            Directory and filename stem tuple.
-        """
-        return self.path_resolver.resolve_target_location(conv, group_key)
+        jobs = (
+            WriteJob(
+                source_conversation=conversation,
+                rendered_conversation=conversation,
+                group_key=group_key,
+            )
+            for group_key, conversations in groups.items()
+            for conversation in conversations
+        )
+        return self.write_jobs(jobs, formatter)
 
     def _get_unique_filepath(
         self,
@@ -155,19 +157,26 @@ class OutputWriter:
         """
         return self.path_resolver.get_unique_filepath(conv, group_key, used_paths)
 
-    def _ensure_directory(self, dir_path: Path) -> bool:
+    def _ensure_directory(
+        self,
+        dir_path: Path,
+        ensured_directories: Set[Path],
+    ) -> bool:
         """Ensure a directory exists.
 
         Args:
             dir_path: Directory to create if needed.
+            ensured_directories: Directories already counted in this batch.
 
         Returns:
             Whether the directory was newly created.
         """
-        if dir_path.exists():
+        if dir_path in ensured_directories:
             return False
+        existed = dir_path.exists()
         dir_path.mkdir(parents=True, exist_ok=True)
-        return True
+        ensured_directories.add(dir_path)
+        return not existed
 
     def _write_single(
         self,
@@ -185,10 +194,9 @@ class OutputWriter:
         Returns:
             Number of characters written.
         """
-        filepath.parent.mkdir(parents=True, exist_ok=True)
         content = formatter.format_conversation(conv)
         with open(filepath, "w", encoding="utf-8") as handle:
             return handle.write(content)
 
 
-__all__ = ["FileNamer", "OutputWriter", "WriteResult"]
+__all__ = ["FileNamer", "OutputWriter", "WriteJob", "WriteResult"]

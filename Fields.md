@@ -224,4 +224,5 @@ chatgpt-export export data.json --split subject --output-dir exports --fields "g
 
 - `analyze --fields` reports field coverage; it does not accept the export-style field-selection spec.
 - `export --split single` writes to stdout unless `--output` is provided.
+- Subject split files are named from the source conversation title plus identifier.
 - Split modes such as `subject`, `date`, and `id` write to `--output-dir`.

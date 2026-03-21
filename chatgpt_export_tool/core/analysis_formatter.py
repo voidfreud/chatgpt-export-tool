@@ -19,11 +19,6 @@ class AnalyzeConfig:
 
     include_fields: bool = False
 
-    @property
-    def include_structure(self) -> bool:
-        """Whether to include sample structure output."""
-        return False
-
 
 def format_analysis_text(
     results: Dict[str, Any],

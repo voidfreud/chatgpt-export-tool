@@ -70,6 +70,7 @@ def categorize_fields(fields: Set[str]) -> Dict[str, List[str]]:
         "author": [],
         "content": [],
         "metadata": [],
+        "unknown": [],
     }
 
     for field in sorted(fields):
@@ -78,6 +79,9 @@ def categorize_fields(fields: Set[str]) -> Dict[str, List[str]]:
                 categorized[category].append(field)
                 break
         else:
-            categorized["metadata"].append(field)
+            if field in METADATA_FIELDS:
+                categorized["metadata"].append(field)
+            else:
+                categorized["unknown"].append(field)
 
     return categorized

@@ -4,13 +4,11 @@ from typing import Any, Dict, List, Optional, Set
 
 from .conversation_filter import ConversationFilter
 from .field_rules import categorize_fields
-from .field_spec import build_field_spec, parse_field_spec
+from .field_spec import FIELD_SELECTION_MODES, build_field_spec, parse_field_spec
 
 
 class FieldSelector:
     """Compatibility wrapper around the parsed field-spec filter."""
-
-    MODES = ["all", "none", "include", "exclude", "groups"]
 
     def __init__(
         self,
@@ -28,8 +26,10 @@ class FieldSelector:
         Raises:
             ValueError: If the selector configuration is invalid.
         """
-        if mode not in self.MODES:
-            raise ValueError(f"Invalid mode: {mode}. Must be one of {self.MODES}")
+        if mode not in FIELD_SELECTION_MODES:
+            raise ValueError(
+                f"Invalid mode: {mode}. Must be one of {list(FIELD_SELECTION_MODES)}"
+            )
 
         self.mode = mode
         self.fields = fields or []

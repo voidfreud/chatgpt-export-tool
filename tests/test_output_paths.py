@@ -30,11 +30,11 @@ def test_output_path_resolver_adds_suffix_for_collisions() -> None:
         file_namer=FileNamer(),
     )
 
-    original = resolver.get_filepath({"title": "Chat"}, "Chat_123")
+    original = resolver.get_filepath({"title": "Chat", "id": "123"}, "Chat_123")
     unique = resolver.get_unique_filepath(
-        {"title": "Chat"},
+        {"title": "Chat", "id": "123"},
         "Chat_123",
         used_paths={original},
     )
 
-    assert unique == Path("/exports/Chat_2.txt")
+    assert unique == Path("/exports/Chat_123_2.txt")

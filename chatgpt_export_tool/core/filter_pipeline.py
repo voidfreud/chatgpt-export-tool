@@ -2,12 +2,11 @@
 
 from typing import Any, Dict, List, Optional
 
-from .filter_builder import build_filter_result
-from .filter_models import FilterConfig, FilterResult
+from .filter_models import FilterConfig
 from .field_selector import FieldSelector
 from .metadata_selector import MetadataSelector
 from .utils import get_logger
-from .validators import ValidationResult
+from .validators import ValidationResult, get_validator
 
 logger = get_logger()
 
@@ -20,6 +19,7 @@ class FilterPipeline:
         field_selector: FieldSelector,
         metadata_selector: Optional[MetadataSelector] = None,
         validation: Optional[ValidationResult] = None,
+        applied_filters: Optional[List[str]] = None,
     ) -> None:
         """Initialize the pipeline.
 
@@ -31,26 +31,51 @@ class FilterPipeline:
         self.field_selector = field_selector
         self.metadata_selector = metadata_selector
         self.validation = validation
+        self.applied_filters = applied_filters or []
 
     @classmethod
     def from_config(
         cls,
         config: FilterConfig,
         raise_on_invalid: bool = False,
-    ) -> FilterResult:
-        """Create selectors for a filter configuration.
+    ) -> "FilterPipeline":
+        """Create a ready-to-use filter pipeline.
 
         Args:
             config: Filter configuration.
             raise_on_invalid: Whether to raise on validation errors.
 
         Returns:
-            Build result with selectors and validation state.
+            Configured filter pipeline.
         """
-        return build_filter_result(
-            config=config,
-            raise_on_invalid=raise_on_invalid,
-            logger=logger,
+        validation: Optional[ValidationResult] = None
+        if config.validate:
+            validation = get_validator().validate_field_spec(config.field_spec)
+            if not validation.is_valid and raise_on_invalid:
+                raise ValueError(
+                    f"Invalid field spec: {config.field_spec}. Errors: {validation.errors}"
+                )
+            for warning in validation.warnings:
+                logger.warning(warning)
+
+        metadata_selector: Optional[MetadataSelector] = None
+        applied_filters = [f"fields={config.field_spec}"]
+
+        if config.include_metadata or config.exclude_metadata:
+            metadata_selector = MetadataSelector.from_args(
+                include=config.include_metadata,
+                exclude=config.exclude_metadata,
+            )
+            applied_filters.append(
+                "metadata: include="
+                f"{config.include_metadata or []}, exclude={config.exclude_metadata or []}"
+            )
+
+        return cls(
+            field_selector=FieldSelector.from_string(config.field_spec),
+            metadata_selector=metadata_selector,
+            validation=validation,
+            applied_filters=applied_filters,
         )
 
     def filter(self, conversation: Dict[str, Any]) -> Dict[str, Any]:
@@ -79,4 +104,4 @@ class FilterPipeline:
         return [self.filter(conversation) for conversation in conversations]
 
 
-__all__ = ["FilterConfig", "FilterPipeline", "FilterResult"]
+__all__ = ["FilterConfig", "FilterPipeline"]

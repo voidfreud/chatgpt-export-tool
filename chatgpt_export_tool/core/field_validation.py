@@ -18,7 +18,6 @@ class FieldValidator:
     def __init__(self) -> None:
         """Initialize the validator with the known field universe."""
         self.available_fields = self._build_available_fields()
-        self.known_categories = set(CATEGORY_FIELDS.keys())
 
     def _build_available_fields(self) -> Set[str]:
         fields: Set[str] = set()
@@ -196,10 +195,6 @@ class FieldValidator:
             self.available_fields,
             max_results=max_results,
         )
-
-    def _find_similar_fields(self, field_name: str, max_results: int = 3) -> List[str]:
-        """Backward-compatible alias for tests and older callers."""
-        return self.find_similar_fields(field_name, max_results=max_results)
 
     def _find_matching_fields(self, pattern: str) -> Set[str]:
         """Find all fields matching a pattern.

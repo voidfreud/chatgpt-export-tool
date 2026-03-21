@@ -41,16 +41,12 @@ class AnalyzeCommand(BaseCommand):
     def _execute(self) -> None:
         """Run the analysis command."""
         file_size = get_file_size(self.filepath)
-        output_lines = []
 
         if self.logger.level <= 20:
-            output_lines.extend(
-                [
-                    "Analyzing structure (this may take a moment for large files)...",
-                    "Using streaming JSON parsing (ijson)...",
-                    "",
-                ]
+            self.logger.info(
+                "Analyzing structure (this may take a moment for large files)..."
             )
+            self.logger.info("Using streaming JSON parsing (ijson)...")
 
         parser = JSONParser(self.filepath)
         results = parser.analyze(verbose=self.logger.level <= 20)
@@ -58,12 +54,10 @@ class AnalyzeCommand(BaseCommand):
         results["filepath"] = self.filepath
         results["analysis_date"] = datetime.now().strftime("%H:%M %d-%m-%Y")
 
-        analysis_output = format_analysis_text(
+        output = format_analysis_text(
             results,
             AnalyzeConfig(include_fields=self.include_fields),
         )
-        output_lines.append(analysis_output)
-        output = "\n".join(output_lines)
 
         if self.output_file:
             with open(self.output_file, "w", encoding="utf-8") as handle:

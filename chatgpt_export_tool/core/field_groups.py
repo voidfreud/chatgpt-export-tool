@@ -1,12 +1,4 @@
-"""
-Field group definitions.
-
-Single source of truth for field group names and mappings used across
-FieldSelector and command-line interface.
-
-This module eliminates the DRY violation where FIELD_GROUPS was
-duplicated in analyze.py and export.py.
-"""
+"""Field group definitions shared by parsing, validation, and CLI help."""
 
 from typing import Dict, List
 

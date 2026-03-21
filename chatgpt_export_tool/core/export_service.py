@@ -1,17 +1,21 @@
 """Export orchestration for conversations."""
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
 from chatgpt_export_tool.core.conversation_formatters import (
     BaseFormatter,
+    JSONFormatter,
+    _json_default,
     get_formatter,
 )
 from chatgpt_export_tool.core.filter_pipeline import FilterConfig, FilterPipeline
-from chatgpt_export_tool.core.output_writer import OutputWriter, WriteResult
+from chatgpt_export_tool.core.output_writer import OutputWriter, WriteJob, WriteResult
 from chatgpt_export_tool.core.parser import JSONParser
-from chatgpt_export_tool.core.splitter import SplitMode, SplitProcessor
+from chatgpt_export_tool.core.split_keys import resolve_group_key
+from chatgpt_export_tool.core.splitter import SplitMode
 from chatgpt_export_tool.core.utils import get_logger
 
 logger = get_logger()
@@ -92,7 +96,7 @@ class ExportService:
         Returns:
             Configured filter pipeline.
         """
-        filter_result = FilterPipeline.from_config(
+        return FilterPipeline.from_config(
             FilterConfig(
                 field_spec=self.config.field_spec,
                 include_metadata=self.config.include_metadata,
@@ -100,7 +104,6 @@ class ExportService:
             ),
             raise_on_invalid=True,
         )
-        return filter_result.build_pipeline()
 
     def _export_single(
         self,
@@ -116,23 +119,16 @@ class ExportService:
         Returns:
             Single-output export result.
         """
-        conversations: List[str] = []
-        for conversation in self.parser.iterate_conversations(
-            verbose=self.config.verbose
-        ):
-            filtered = pipeline.filter(conversation)
-            conversations.append(formatter.format_conversation(filtered))
-
-        output = "\n".join(conversations)
-
         if self.config.output_file:
             output_path = Path(self.config.output_file)
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(output, encoding="utf-8")
+            self._write_single_output(output_path, formatter, pipeline)
             logger.info("Wrote single export file to %s", output_path)
             return ExportResult(output_file=str(output_path))
 
-        return ExportResult(stdout_output=output)
+        return ExportResult(
+            stdout_output=self._build_single_stdout_output(formatter, pipeline)
+        )
 
     def _export_split(
         self,
@@ -148,22 +144,24 @@ class ExportService:
         Returns:
             Split-output export result.
         """
-        split_result = SplitProcessor(
-            self.parser,
-            mode=self.config.split_mode,
-        ).process()
-
-        filtered_groups = {
-            group_key: [pipeline.filter(conversation) for conversation in conversations]
-            for group_key, conversations in split_result.groups.items()
-        }
-
         writer = OutputWriter(
             output_dir=self.config.output_dir,
             format_type=self.config.format_type,
             split_mode=self.config.split_mode,
         )
-        write_result = writer.write_conversations(filtered_groups, formatter)
+        jobs = (
+            WriteJob(
+                source_conversation=conversation,
+                rendered_conversation=pipeline.filter(conversation),
+                group_key=resolve_group_key(
+                    self.config.split_mode, conversation, logger
+                ),
+            )
+            for conversation in self.parser.iterate_conversations(
+                verbose=self.config.verbose
+            )
+        )
+        write_result = writer.write_jobs(jobs, formatter)
         logger.info(
             "Wrote %s split export files to %s",
             write_result.files_written,
@@ -173,3 +171,64 @@ class ExportService:
             output_dir=self.config.output_dir,
             write_result=write_result,
         )
+
+    def _build_single_stdout_output(
+        self,
+        formatter: BaseFormatter,
+        pipeline: FilterPipeline,
+    ) -> str:
+        """Build stdout output for single-export mode."""
+        if isinstance(formatter, JSONFormatter):
+            conversations = [
+                pipeline.filter(conversation)
+                for conversation in self.parser.iterate_conversations(
+                    verbose=self.config.verbose
+                )
+            ]
+            return json.dumps(
+                conversations,
+                indent=formatter.indent,
+                sort_keys=formatter.sort_keys,
+                default=_json_default,
+            )
+
+        return "\n".join(
+            formatter.format_conversation(pipeline.filter(conversation))
+            for conversation in self.parser.iterate_conversations(
+                verbose=self.config.verbose
+            )
+        )
+
+    def _write_single_output(
+        self,
+        output_path: Path,
+        formatter: BaseFormatter,
+        pipeline: FilterPipeline,
+    ) -> None:
+        """Write single-output export content incrementally."""
+        with open(output_path, "w", encoding="utf-8") as handle:
+            if isinstance(formatter, JSONFormatter):
+                handle.write("[")
+                first = True
+                for conversation in self.parser.iterate_conversations(
+                    verbose=self.config.verbose
+                ):
+                    if not first:
+                        handle.write(",\n")
+                    handle.write(
+                        formatter.format_conversation(pipeline.filter(conversation))
+                    )
+                    first = False
+                handle.write("]")
+                return
+
+            first = True
+            for conversation in self.parser.iterate_conversations(
+                verbose=self.config.verbose
+            ):
+                if not first:
+                    handle.write("\n")
+                handle.write(
+                    formatter.format_conversation(pipeline.filter(conversation))
+                )
+                first = False

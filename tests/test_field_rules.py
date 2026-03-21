@@ -37,9 +37,10 @@ def test_should_copy_nested_field_only_for_explicit_nested_targets() -> None:
 
 
 def test_categorize_fields_still_matches_existing_contract() -> None:
-    """Field categorization should remain compatible with analysis output."""
+    """Unknown fields should be separated from known metadata names."""
     categorized = categorize_fields({"title", "author", "unknown_field"})
 
     assert categorized["conversation"] == ["title"]
     assert categorized["message"] == ["author"]
-    assert categorized["metadata"] == ["unknown_field"]
+    assert categorized["metadata"] == []
+    assert categorized["unknown"] == ["unknown_field"]

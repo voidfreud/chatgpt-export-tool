@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any, Dict, Optional, Set
 
-from .conversation_access import get_conversation_title
+from .conversation_access import get_conversation_title, get_subject_filename_stem
 from .file_naming import FileNamer
 from chatgpt_export_tool.core.splitter import SplitMode
 
@@ -59,13 +59,13 @@ class OutputPathResolver:
         Returns:
             Directory and filename stem tuple.
         """
-        title = get_conversation_title(conversation)
-
         if self.split_mode == SplitMode.DATE:
-            return self.output_dir / group_key, title
+            return self.output_dir / group_key, get_conversation_title(conversation)
         if self.split_mode == SplitMode.ID:
             return self.output_dir, group_key
-        return self.output_dir, title
+        if self.split_mode == SplitMode.SUBJECT:
+            return self.output_dir, get_subject_filename_stem(conversation)
+        return self.output_dir, get_conversation_title(conversation)
 
     def get_unique_filepath(
         self,

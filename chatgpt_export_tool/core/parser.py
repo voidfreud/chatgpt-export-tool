@@ -37,7 +37,6 @@ class JSONParser:
             - conversation_count: Number of conversations
             - message_count: Total message nodes
             - all_fields: Set of all unique field names
-            - sample_conversation: Sample structure from first conversation
         """
         logger.debug("Starting JSON analysis for file: %s", self.filepath)
         collector = AnalysisCollector()
@@ -55,11 +54,6 @@ class JSONParser:
                         "Conversation %s: processing mapping with %s nodes",
                         collector.conversation_count,
                         len(mapping),
-                    )
-
-                if collector.sample_captured and collector.conversation_count == 1:
-                    logger.debug(
-                        "Storing sample conversation structure (conversation 1)"
                     )
 
                 if verbose and collector.conversation_count % 100 == 0:

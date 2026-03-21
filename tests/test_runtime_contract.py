@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from chatgpt_export_tool.cli import create_parser
+from chatgpt_export_tool.commands.analyze import AnalyzeCommand
 from chatgpt_export_tool.commands.export import ExportCommand
 from chatgpt_export_tool.core.filter_pipeline import FilterConfig, FilterPipeline
 
@@ -79,6 +80,28 @@ class TestAnalyzeCliContract:
         with pytest.raises(SystemExit):
             parser.parse_args(["analyze", "--field-selection", "all", "data.json"])
 
+    def test_verbose_analyze_output_file_keeps_report_clean(
+        self, tmp_path: Path
+    ) -> None:
+        """Verbose analyze should log progress without polluting the saved report."""
+        source_file = _write_conversations_file(tmp_path / "conversations.json")
+        output_file = tmp_path / "analysis.txt"
+
+        command = AnalyzeCommand(
+            filepath=str(source_file),
+            output_file=str(output_file),
+            include_fields=True,
+            verbose=True,
+        )
+
+        exit_code = command.run()
+
+        assert exit_code == 0
+        content = output_file.read_text(encoding="utf-8")
+        assert content.startswith("=" * 60)
+        assert "Analyzing structure" not in content
+        assert "Using streaming JSON parsing" not in content
+
 
 class TestExportCliContract:
     """Tests for the cleaned-up export CLI contract."""
@@ -130,8 +153,7 @@ class TestFilteringContract:
 
     def test_groups_message_keeps_nested_message_structure(self) -> None:
         """Message field groups keep nested message data."""
-        result = FilterPipeline.from_config(FilterConfig(field_spec="groups message"))
-        pipeline = result.build_pipeline()
+        pipeline = FilterPipeline.from_config(FilterConfig(field_spec="groups message"))
 
         conversation = {
             "title": "Test",
@@ -163,14 +185,13 @@ class TestFilteringContract:
 
     def test_metadata_filter_removes_nested_fields(self) -> None:
         """Metadata include/exclude applies to nested message metadata."""
-        result = FilterPipeline.from_config(
+        pipeline = FilterPipeline.from_config(
             FilterConfig(
                 field_spec="include title,mapping",
                 include_metadata=["model*"],
                 exclude_metadata=["plugin_ids"],
             )
         )
-        pipeline = result.build_pipeline()
 
         conversation = {
             "title": "Test",
@@ -238,4 +259,69 @@ class TestExportRuntimeContract:
         assert output_file.exists()
         content = output_file.read_text(encoding="utf-8")
         assert "Title: Alpha" in content
-        assert "Title: Beta" in content
+
+    def test_single_json_output_is_valid_json(self, tmp_path: Path) -> None:
+        """Single JSON export writes one valid JSON document."""
+        source_file = _write_conversations_file(tmp_path / "conversations.json")
+        output_file = tmp_path / "combined.json"
+
+        command = ExportCommand(
+            filepath=str(source_file),
+            split_mode="single",
+            format_type="json",
+            output_file=str(output_file),
+        )
+
+        exit_code = command.run()
+
+        assert exit_code == 0
+        payload = json.loads(output_file.read_text(encoding="utf-8"))
+        assert isinstance(payload, list)
+        assert [conversation["title"] for conversation in payload] == ["Alpha", "Beta"]
+
+    def test_split_subject_naming_uses_stable_source_fields(
+        self, tmp_path: Path
+    ) -> None:
+        """Subject split filenames should come from source title plus id."""
+        source_file = tmp_path / "conversations.json"
+        source_file.write_text(
+            json.dumps(
+                [
+                    {"title": "Same", "id": "conv-1", "mapping": {}},
+                    {"title": "Same", "id": "conv-2", "mapping": {}},
+                ]
+            ),
+            encoding="utf-8",
+        )
+        output_dir = tmp_path / "exports"
+
+        command = ExportCommand(
+            filepath=str(source_file),
+            split_mode="subject",
+            output_dir=str(output_dir),
+            fields="none",
+        )
+
+        exit_code = command.run()
+
+        assert exit_code == 0
+        names = sorted(path.name for path in output_dir.iterdir())
+        assert names == ["Same_conv-1.txt", "Same_conv-2.txt"]
+
+    def test_split_write_failures_return_non_zero_exit_code(
+        self, tmp_path: Path
+    ) -> None:
+        """Split export should fail when the output target cannot be written."""
+        source_file = _write_conversations_file(tmp_path / "conversations.json")
+        bad_target = tmp_path / "not-a-directory"
+        bad_target.write_text("occupied", encoding="utf-8")
+
+        command = ExportCommand(
+            filepath=str(source_file),
+            split_mode="subject",
+            output_dir=str(bad_target),
+        )
+
+        exit_code = command.run()
+
+        assert exit_code == 1

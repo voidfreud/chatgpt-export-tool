@@ -3,6 +3,7 @@
 from typing import List
 
 from .category_fields import METADATA_FIELDS
+from .metadata_rules import get_matching_metadata_fields
 from .validation_models import ValidationResult
 
 
@@ -24,7 +25,8 @@ def validate_metadata_pattern(pattern: str) -> ValidationResult:
     if pattern == "*":
         return result
 
-    if pattern not in METADATA_FIELDS:
+    matches = get_matching_metadata_fields([pattern], set(METADATA_FIELDS))
+    if not matches:
         result.add_warning(
             f"Pattern '{pattern}' matches no known metadata fields. "
             f"Known fields: {', '.join(sorted(METADATA_FIELDS.keys()))}"
@@ -33,21 +35,15 @@ def validate_metadata_pattern(pattern: str) -> ValidationResult:
     return result
 
 
-def validate_metadata_patterns(
-    patterns: List[str],
-    pattern_type: str = "include",
-) -> ValidationResult:
+def validate_metadata_patterns(patterns: List[str]) -> ValidationResult:
     """Validate multiple metadata field patterns.
 
     Args:
         patterns: Metadata patterns to validate.
-        pattern_type: Unused compatibility parameter retained for callers.
 
     Returns:
         Aggregated validation result.
     """
-    del pattern_type
-
     result = ValidationResult()
     for pattern in patterns:
         result.merge(validate_metadata_pattern(pattern))

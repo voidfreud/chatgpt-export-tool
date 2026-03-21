@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 
 from chatgpt_export_tool.core.conversation_formatters import TextFormatter
 from chatgpt_export_tool.core.output_writer import FileNamer, OutputWriter, WriteResult
+from chatgpt_export_tool.core.output_paths import OutputPathResolver
 from chatgpt_export_tool.core.splitter import SplitMode
 
 
@@ -179,59 +180,15 @@ class TestOutputWriter:
         assert writer.format_type == "json"
         assert writer.split_mode == SplitMode.DATE
 
-    def test_get_filepath_single_mode(self):
-        """Test _get_filepath returns output_dir/filename for SINGLE mode."""
-        writer = OutputWriter(output_dir="/output", split_mode=SplitMode.SINGLE)
+    def test_path_resolution_subject_mode_uses_title_plus_id(self):
+        """Subject-mode filenames should include the source identifier."""
+        resolver = OutputPathResolver(
+            output_dir="/output", split_mode=SplitMode.SUBJECT
+        )
 
-        conv = {"title": "Test"}
-        path = writer._get_filepath(conv, "all")
+        path = resolver.get_filepath({"title": "Test", "id": "123"}, "Test_123")
 
-        assert path == Path("/output/Test.txt")
-
-    def test_get_filepath_date_mode(self):
-        """Test _get_filepath returns subdir/filename for DATE mode."""
-        writer = OutputWriter(output_dir="/output", split_mode=SplitMode.DATE)
-
-        conv = {"title": "Test"}
-        path = writer._get_filepath(conv, "2024-03-01")
-
-        assert path == Path("/output/2024-03-01/Test.txt")
-
-    def test_get_filepath_subject_mode(self):
-        """Test _get_filepath returns output_dir/filename for SUBJECT mode."""
-        writer = OutputWriter(output_dir="/output", split_mode=SplitMode.SUBJECT)
-
-        conv = {"title": "Test"}
-        path = writer._get_filepath(conv, "Test_123")
-
-        assert path == Path("/output/Test.txt")
-
-    def test_write_single_creates_directory(self, tmp_path):
-        """Test _write_single creates parent directories."""
-        writer = OutputWriter(output_dir=str(tmp_path), format_type="txt")
-
-        conv = {"title": "Test Conversation"}
-        filepath = tmp_path / "subdir" / "test.txt"
-
-        formatter = TextFormatter()
-        bytes_written = writer._write_single(conv, filepath, formatter)
-
-        assert filepath.exists()
-        assert bytes_written > 0
-
-    def test_write_single_writes_content(self, tmp_path):
-        """Test _write_single writes formatted content."""
-        writer = OutputWriter(output_dir=str(tmp_path), format_type="txt")
-
-        conv = {"title": "Test Conversation", "id": "123", "create_time": 1709337600.0}
-        filepath = tmp_path / "test.txt"
-
-        formatter = TextFormatter()
-        writer._write_single(conv, filepath, formatter)
-
-        content = filepath.read_text()
-        assert "Test Conversation" in content
-        assert "123" in content
+        assert path == Path("/output/Test_123.txt")
 
     def test_write_conversations_single_group(self, tmp_path):
         """Test write_conversations with single group."""
@@ -268,6 +225,7 @@ class TestOutputWriter:
         result = writer.write_conversations(groups, formatter)
 
         assert result.files_written == 2
+        assert result.directories_created == 2
         assert (tmp_path / "2024-03-01").exists()
         assert (tmp_path / "2024-03-02").exists()
 
@@ -286,24 +244,6 @@ class TestOutputWriter:
         assert (tmp_path / "nonexistent").exists()
         assert result.files_written == 1
         assert len(result.errors) == 0
-
-    def test_ensure_directory_creates_new(self, tmp_path):
-        """Test _ensure_directory creates directory when missing."""
-        writer = OutputWriter(output_dir=str(tmp_path))
-
-        new_dir = tmp_path / "new_dir" / "nested"
-        created = writer._ensure_directory(new_dir)
-
-        assert created is True
-        assert new_dir.exists()
-
-    def test_ensure_directory_existing(self, tmp_path):
-        """Test _ensure_directory returns False when dir exists."""
-        writer = OutputWriter(output_dir=str(tmp_path))
-
-        created = writer._ensure_directory(tmp_path)
-
-        assert created is False
 
 
 class TestOutputWriterEdgeCases:
@@ -447,52 +387,3 @@ class TestTextFormatterTruncationFix:
         output = formatter.format_conversation(conv)
 
         assert "only part" in output
-
-    # -- 3. Dict values must NOT be truncated --
-
-    def test_format_dict_long_value_not_truncated(self):
-        """_format_dict() must not truncate string values longer than 100 chars."""
-        long_value = "B" * 200
-        data = {"description": long_value}
-
-        formatter = TextFormatter()
-        output = formatter._format_dict(data)
-
-        assert long_value in output, (
-            "Dict value was truncated; expected full 200-char string in output"
-        )
-        assert "..." not in output, (
-            "Output contains '...' which suggests _format_dict truncation"
-        )
-
-    def test_format_dict_very_long_value_not_truncated(self):
-        """_format_dict() must preserve values of 1000+ chars."""
-        long_value = "C" * 1000
-        data = {"key": long_value}
-
-        formatter = TextFormatter()
-        output = formatter._format_dict(data)
-
-        assert long_value in output, "Very long dict value (1000 chars) was truncated"
-
-    def test_format_dict_multiple_long_values(self):
-        """_format_dict() must preserve all long values in a multi-key dict."""
-        val1 = "D" * 150
-        val2 = "E" * 250
-        data = {"first": val1, "second": val2}
-
-        formatter = TextFormatter()
-        output = formatter._format_dict(data)
-
-        assert val1 in output, "First long value was truncated"
-        assert val2 in output, "Second long value was truncated"
-
-    def test_format_dict_nested_long_values(self):
-        """_format_dict() must not truncate values in nested dicts."""
-        long_value = "F" * 300
-        data = {"outer": {"inner": long_value}}
-
-        formatter = TextFormatter()
-        output = formatter._format_dict(data)
-
-        assert long_value in output, "Nested dict value was truncated"

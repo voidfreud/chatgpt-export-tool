@@ -1,14 +1,9 @@
 """Metadata filtering for conversations."""
 
-from copy import deepcopy
 from typing import Any, Dict, List, Optional, Set
 
 from .category_fields import METADATA_FIELDS
-from .metadata_rules import (
-    get_matching_metadata_fields,
-    resolve_metadata_fields_to_keep,
-)
-from .validators import ValidationResult, validate_metadata_pattern
+from .metadata_rules import resolve_metadata_fields_to_keep
 
 
 class MetadataSelector:
@@ -49,97 +44,48 @@ class MetadataSelector:
         )
 
     def filter_metadata(self, conv: Dict[str, Any]) -> Dict[str, Any]:
-        """Filter top-level and nested message metadata.
+        """Filter top-level and nested message metadata in place.
 
         Args:
             conv: Conversation dictionary.
 
         Returns:
-            Filtered conversation copy.
+            Filtered conversation dictionary.
         """
-        result = deepcopy(conv)
         fields_to_keep = resolve_metadata_fields_to_keep(
             self.include_fields,
             self.exclude_fields,
             set(METADATA_FIELDS.keys()),
         )
 
-        for key in list(result.keys()):
+        for key in list(conv.keys()):
             if key in METADATA_FIELDS and key not in fields_to_keep:
-                del result[key]
+                del conv[key]
 
-        mapping = result.get("mapping")
+        mapping = conv.get("mapping")
         if isinstance(mapping, dict):
-            result["mapping"] = self._filter_mapping_metadata(mapping, fields_to_keep)
+            self._filter_mapping_metadata(mapping, fields_to_keep)
 
-        return result
-
-    def get_included_fields(self) -> Set[str]:
-        """Resolve included metadata fields.
-
-        Returns:
-            Included metadata field names.
-        """
-        if not self.include_fields:
-            return set()
-        return get_matching_metadata_fields(
-            self.include_fields,
-            set(METADATA_FIELDS.keys()),
-        )
-
-    def get_excluded_fields(self) -> Set[str]:
-        """Resolve excluded metadata fields.
-
-        Returns:
-            Excluded metadata field names.
-        """
-        if not self.exclude_fields:
-            return set()
-        return get_matching_metadata_fields(
-            self.exclude_fields,
-            set(METADATA_FIELDS.keys()),
-        )
-
-    def validate(self) -> ValidationResult:
-        """Validate configured include/exclude patterns.
-
-        Returns:
-            Validation result.
-        """
-        result = ValidationResult()
-
-        for pattern in self.include_fields:
-            result.merge(validate_metadata_pattern(pattern))
-
-        for pattern in self.exclude_fields:
-            result.merge(validate_metadata_pattern(pattern))
-        return result
+        return conv
 
     def _filter_mapping_metadata(
         self,
         mapping: Dict[str, Any],
         fields_to_keep: Set[str],
-    ) -> Dict[str, Any]:
-        """Filter metadata in message nodes.
+    ) -> None:
+        """Filter metadata in message nodes in place.
 
         Args:
             mapping: Conversation mapping dictionary.
             fields_to_keep: Resolved metadata fields to keep.
 
-        Returns:
-            Filtered mapping copy.
         """
-        filtered_mapping: Dict[str, Any] = {}
-
-        for node_id, node in mapping.items():
+        for node in mapping.values():
             if not isinstance(node, dict):
-                filtered_mapping[node_id] = node
                 continue
 
-            node_copy = deepcopy(node)
-            message = node_copy.get("message")
+            message = node.get("message")
             if not isinstance(message, dict):
-                filtered_mapping[node_id] = node_copy
                 continue
 
             metadata = message.get("metadata")
@@ -149,6 +95,3 @@ class MetadataSelector:
                     for key, value in metadata.items()
                     if key in fields_to_keep
                 }
-            filtered_mapping[node_id] = node_copy
-
-        return filtered_mapping

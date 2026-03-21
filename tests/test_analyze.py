@@ -6,10 +6,13 @@ import pytest
 
 # Import from the new package structure
 from chatgpt_export_tool.cli import create_parser, main
-from chatgpt_export_tool.core.analysis_formatter import AnalyzeConfig
-from chatgpt_export_tool.core.conversation_formatters import TextFormatter
+from chatgpt_export_tool.core.analysis_formatter import (
+    AnalyzeConfig,
+    format_analysis_text,
+)
 from chatgpt_export_tool.core.field_selector import FieldSelector
-from chatgpt_export_tool.core.parser import JSONParser, format_size, get_file_size
+from chatgpt_export_tool.core.parser import JSONParser
+from chatgpt_export_tool.core.utils import format_size, get_file_size
 
 
 class TestImportModule:
@@ -82,12 +85,12 @@ class TestCategorizeFields:
         assert "content" in result["message"]
         assert "status" in result["message"]
 
-    def test_categorize_metadata_fields(self):
-        """Test that unknown fields go to metadata."""
+    def test_categorize_unknown_fields(self):
+        """Test that unknown fields are tracked separately."""
         fields = {"unknown_field", "custom_field"}
         result = FieldSelector.categorize_fields(fields)
-        assert "unknown_field" in result["metadata"]
-        assert "custom_field" in result["metadata"]
+        assert "unknown_field" in result["unknown"]
+        assert "custom_field" in result["unknown"]
 
     def test_categorize_empty_fields(self):
         """Test categorizing empty field set."""
@@ -95,6 +98,7 @@ class TestCategorizeFields:
         assert result["conversation"] == []
         assert result["message"] == []
         assert result["metadata"] == []
+        assert result["unknown"] == []
 
 
 class TestGetFileSize:
@@ -205,32 +209,28 @@ class TestAnalyzeConfig:
         """Test that include_fields=False excludes field info."""
         config = AnalyzeConfig(include_fields=False)
         assert config.include_fields is False
-        assert config.include_structure is False
 
     def test_include_fields_true_includes_fields_only(self):
         """Test that include_fields=True includes only fields (no structure)."""
         config = AnalyzeConfig(include_fields=True)
         assert config.include_fields is True
-        assert config.include_structure is False
 
 
-class TestTextFormatterAnalysis:
-    """Test TextFormatter analysis output with include_fields."""
+class TestAnalysisFormatting:
+    """Test analysis output formatting with include_fields."""
 
     def test_format_analysis_without_fields(self):
         """Test output without --fields contains only basic info."""
-        formatter = TextFormatter()
         results = {
             "conversation_count": 10,
             "message_count": 100,
             "all_fields": {"title", "create_time"},
-            "sample_conversation": {"title": "Test"},
             "filepath": "data/conversations.json",
             "analysis_date": "14:30 20-03-2026",
             "file_size": "128.11 MB",
         }
         config = AnalyzeConfig(include_fields=False)
-        output = formatter._format_analysis(results, config)
+        output = format_analysis_text(results, config)
 
         # Should contain basic info
         assert "10" in output or "10" in output  # conversation count
@@ -247,18 +247,16 @@ class TestTextFormatterAnalysis:
 
     def test_format_analysis_with_fields(self):
         """Test output with --fields includes field info."""
-        formatter = TextFormatter()
         results = {
             "conversation_count": 10,
             "message_count": 100,
             "all_fields": {"title", "create_time", "mapping"},
-            "sample_conversation": {"title": "Test"},
             "filepath": "data/conversations.json",
             "analysis_date": "14:30 20-03-2026",
             "file_size": "128.11 MB",
         }
         config = AnalyzeConfig(include_fields=True)
-        output = formatter._format_analysis(results, config)
+        output = format_analysis_text(results, config)
 
         # Should contain basic info
         assert "10" in output
@@ -275,17 +273,15 @@ class TestTextFormatterAnalysis:
 
     def test_format_analysis_without_config_defaults_to_no_fields(self):
         """Test that _format_analysis without config defaults to no fields."""
-        formatter = TextFormatter()
         results = {
             "conversation_count": 10,
             "message_count": 100,
             "all_fields": {"title"},
-            "sample_conversation": {"title": "Test"},
             "filepath": "data/conversations.json",
             "analysis_date": "14:30 20-03-2026",
             "file_size": "128.11 MB",
         }
-        output = formatter._format_analysis(results, None)
+        output = format_analysis_text(results, None)
 
         # Should contain analysis date and filepath
         assert "Analysis date:" in output

@@ -2,12 +2,9 @@
 
 import json
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from decimal import Decimal
+from typing import Any, Dict
 
-from chatgpt_export_tool.core.analysis_formatter import (
-    AnalyzeConfig,
-    format_analysis_text,
-)
 from chatgpt_export_tool.core.conversation_access import (
     get_display_conversation_id,
     get_message_role,
@@ -19,30 +16,19 @@ from chatgpt_export_tool.core.utils import get_logger
 logger = get_logger()
 
 
+def _json_default(value: Any) -> Any:
+    """Normalize non-standard JSON values produced by streaming parsing."""
+    if isinstance(value, Decimal):
+        return int(value) if value == value.to_integral_value() else float(value)
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
 class BaseFormatter(ABC):
-    """Abstract base class for output formatters."""
-
-    @abstractmethod
-    def format(self, data: Any) -> str:
-        """Format data to string representation.
-
-        Args:
-            data: Data to format.
-
-        Returns:
-            Formatted output string.
-        """
+    """Abstract base class for conversation formatters."""
 
     @abstractmethod
     def format_conversation(self, conv: Dict[str, Any]) -> str:
-        """Format a single conversation.
-
-        Args:
-            conv: Conversation dictionary.
-
-        Returns:
-            Formatted conversation string.
-        """
+        """Format a single conversation."""
 
 
 class TextFormatter(BaseFormatter):
@@ -62,75 +48,6 @@ class TextFormatter(BaseFormatter):
             include_header,
             indent,
         )
-
-    def format(self, data: Any, analyze_config: AnalyzeConfig | None = None) -> str:
-        """Format generic data as text.
-
-        Args:
-            data: Data to format.
-            analyze_config: Optional configuration for analysis output.
-
-        Returns:
-            Formatted output string.
-        """
-        if isinstance(data, dict):
-            if "conversation_count" in data and "message_count" in data:
-                return self._format_analysis(data, analyze_config)
-            return self._format_dict(data)
-        if isinstance(data, list):
-            return self._format_list(data)
-        return str(data)
-
-    def _format_analysis(
-        self,
-        results: Dict[str, Any],
-        config: AnalyzeConfig | None = None,
-    ) -> str:
-        """Format analysis results.
-
-        Args:
-            results: Analysis results dictionary.
-            config: Optional analysis formatting configuration.
-
-        Returns:
-            Formatted analysis output.
-        """
-        return format_analysis_text(results, config)
-
-    def _format_dict(self, data: Dict[str, Any], level: int = 0) -> str:
-        """Format a nested dictionary as text.
-
-        Args:
-            data: Dictionary to format.
-            level: Current indentation level.
-
-        Returns:
-            Formatted dictionary output.
-        """
-        prefix = self.indent * level
-        lines: List[str] = []
-
-        for key, value in data.items():
-            if isinstance(value, dict):
-                lines.append(f"{prefix}{key}:")
-                lines.append(self._format_dict(value, level + 1))
-            elif isinstance(value, list):
-                lines.append(f"{prefix}{key}: [{len(value)} items]")
-            else:
-                lines.append(f"{prefix}{key}: {value}")
-
-        return "\n".join(lines)
-
-    def _format_list(self, data: List[Any]) -> str:
-        """Format a list as text.
-
-        Args:
-            data: List to format.
-
-        Returns:
-            Formatted list output.
-        """
-        return "\n".join(f"[{index}] {item}" for index, item in enumerate(data))
 
     def format_conversation(self, conv: Dict[str, Any]) -> str:
         """Format a conversation as text.
@@ -174,17 +91,6 @@ class JSONFormatter(BaseFormatter):
         self.indent = indent
         self.sort_keys = sort_keys
 
-    def format(self, data: Any) -> str:
-        """Format arbitrary data as JSON.
-
-        Args:
-            data: Data to serialize.
-
-        Returns:
-            JSON string output.
-        """
-        return json.dumps(data, indent=self.indent, sort_keys=self.sort_keys)
-
     def format_conversation(self, conv: Dict[str, Any]) -> str:
         """Format a conversation as JSON.
 
@@ -194,7 +100,12 @@ class JSONFormatter(BaseFormatter):
         Returns:
             JSON string output.
         """
-        return self.format(conv)
+        return json.dumps(
+            conv,
+            indent=self.indent,
+            sort_keys=self.sort_keys,
+            default=_json_default,
+        )
 
 
 FORMATTERS = {

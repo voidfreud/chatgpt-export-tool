@@ -14,7 +14,6 @@ class AnalysisCollector:
             "conversation_count": 0,
             "message_count": 0,
             "all_fields": set(),
-            "sample_conversation": None,
             "min_date": None,
             "max_date": None,
         }
@@ -31,13 +30,6 @@ class AnalysisCollector:
         self._update_date_range(conversation.get("create_time"))
         self._collect_mapping_fields(conversation.get("mapping"))
 
-        if self._results["sample_conversation"] is None:
-            self._results["sample_conversation"] = {
-                "title": conversation.get("title", "N/A"),
-                "has_mapping": "mapping" in conversation,
-                "mapping_size": len(conversation.get("mapping", {})),
-            }
-
     def to_dict(self) -> Dict[str, Any]:
         """Return the collected results as a plain dictionary.
 
@@ -46,19 +38,12 @@ class AnalysisCollector:
         """
         results = dict(self._results)
         results["all_fields"] = set(self._results["all_fields"])
-        if isinstance(self._results["sample_conversation"], dict):
-            results["sample_conversation"] = dict(self._results["sample_conversation"])
         return results
 
     @property
     def conversation_count(self) -> int:
         """Return the number of collected conversations."""
         return int(self._results["conversation_count"])
-
-    @property
-    def sample_captured(self) -> bool:
-        """Whether a sample conversation has already been stored."""
-        return self._results["sample_conversation"] is not None
 
     def _update_date_range(self, create_time: Any) -> None:
         """Update the min/max conversation timestamps.
