@@ -108,7 +108,8 @@ class TextFormatter(BaseFormatter):
             if index > 0:
                 lines.append("")
             lines.append(self._render_turn_heading(entry))
-            lines.extend(entry.text.splitlines() or [""])
+            body_lines = entry.text.splitlines() or [""]
+            lines.extend(f"{self.indent}{line}" if line else self.indent for line in body_lines)
         return lines
 
     def _render_turn_heading(self, entry: Any) -> str:
@@ -121,8 +122,8 @@ class TextFormatter(BaseFormatter):
                 entry.timestamp,
                 self.text_output_config.turn_time_format,
             )
-            return f"{role_label} [{timestamp}]"
-        return role_label
+            return f"{role_label} [{timestamp}]:"
+        return f"{role_label}:"
 
     def _get_role_label(self, role: str, content_type: str) -> str:
         if role == "assistant" and content_type == "thoughts":

@@ -47,9 +47,12 @@ def test_text_formatter_renders_human_readable_header_and_turn_timestamps() -> N
     assert "Title: Transcript" in output
     assert "ID: conv-1" in output
     assert f"Created: {format_timestamp(1709337600.0, '%Y-%m-%d %H:%M')}" in output
-    assert f"User [{format_timestamp(1709337600.0, '%H:%M')}]\nquestion" in output
     assert (
-        f"Assistant [{format_timestamp(1709337660.0, '%H:%M')}]\nanswer" in output
+        f"User [{format_timestamp(1709337600.0, '%H:%M')}]:\n  question" in output
+    )
+    assert (
+        f"Assistant [{format_timestamp(1709337660.0, '%H:%M')}]:\n  answer"
+        in output
     )
 
 
@@ -86,8 +89,8 @@ def test_text_formatter_can_disable_header_and_turn_timestamps() -> None:
 
     assert "Title:" not in output
     assert "[00:" not in output
-    assert "User\nquestion" in output
-    assert "Assistant\nanswer" in output
+    assert "User:\n  question" in output
+    assert "Assistant:\n  answer" in output
 
 
 def test_text_formatter_renders_context_as_preamble_not_chat_turn() -> None:
@@ -131,5 +134,5 @@ def test_text_formatter_renders_context_as_preamble_not_chat_turn() -> None:
     assert "Conversation Context" in output
     assert "User profile: profile" in output
     assert "User instructions: instructions" in output
-    assert "User\nquestion" in output
-    assert "Assistant\nanswer" in output
+    assert "User:\n  question" in output
+    assert "Assistant:\n  answer" in output
