@@ -7,6 +7,7 @@ Tests FileNamer, WriteResult, and OutputWriter classes.
 import os
 import tempfile
 from pathlib import Path
+from typing import Dict, List, Optional
 from unittest.mock import MagicMock
 
 import pytest
@@ -338,3 +339,165 @@ class TestOutputWriterEdgeCases:
         # Both groups should succeed
         assert result.files_written == 2
         assert len(result.errors) == 0
+
+
+class TestTextFormatterTruncationFix:
+    """Tests verifying that the truncation bugs in TextFormatter are fixed.
+
+    Regression tests for three bugs:
+    1. format_conversation() hard-truncated message text at 200 chars
+    2. _format_dict() hard-truncated dict values at 100 chars
+    3. format_conversation() only extracted parts[0] from multi-part messages
+    """
+
+    # -- Helper to build a minimal conversation dict with mapping --
+
+    @staticmethod
+    def _make_conversation(
+        title: str = "Test",
+        parts: Optional[List[str]] = None,
+        role: str = "user",
+    ) -> Dict[str, object]:
+        """Build a minimal conversation dict with a single mapping node.
+
+        Args:
+            title: Conversation title.
+            parts: List of content parts for the message. Defaults to ["hello"].
+            role: Author role for the message.
+
+        Returns:
+            Conversation dictionary suitable for TextFormatter.format_conversation().
+        """
+        if parts is None:
+            parts = ["hello"]
+        return {
+            "title": title,
+            "id": "conv-1",
+            "create_time": 1709337600.0,
+            "mapping": {
+                "node-1": {
+                    "message": {
+                        "author": {"role": role},
+                        "content": {"parts": parts},
+                    }
+                }
+            },
+        }
+
+    # -- 1. Long messages must NOT be truncated --
+
+    def test_format_conversation_long_message_not_truncated(self):
+        """A message longer than 200 chars must appear in full (no '...' suffix)."""
+        long_text = "A" * 500
+        conv = self._make_conversation(parts=[long_text])
+
+        formatter = TextFormatter()
+        output = formatter.format_conversation(conv)
+
+        # The full text must be present — not just the first 200 chars + "..."
+        assert long_text in output, (
+            "Message content was truncated; expected full 500-char string in output"
+        )
+
+    def test_format_conversation_very_long_message_preserved(self):
+        """A message of 2000+ chars must be fully preserved."""
+        long_text = "X" * 2000
+        conv = self._make_conversation(parts=[long_text])
+
+        formatter = TextFormatter()
+        output = formatter.format_conversation(conv)
+
+        assert long_text in output, "Very long message (2000 chars) was truncated"
+
+    # -- 2. Multi-part messages must be fully captured --
+
+    def test_format_conversation_multi_part_message(self):
+        """All parts from a multi-part message must appear in the output."""
+        part1 = "First part of the message"
+        part2 = "Second part of the message"
+        conv = self._make_conversation(parts=[part1, part2])
+
+        formatter = TextFormatter()
+        output = formatter.format_conversation(conv)
+
+        assert part1 in output, "First content part is missing from output"
+        assert part2 in output, "Second content part is missing from output"
+
+    def test_format_conversation_three_parts(self):
+        """Messages with three parts should have all three in output."""
+        parts = ["Alpha", "Beta", "Gamma"]
+        conv = self._make_conversation(parts=parts)
+
+        formatter = TextFormatter()
+        output = formatter.format_conversation(conv)
+
+        for part in parts:
+            assert part in output, f"Content part '{part}' is missing from output"
+
+    def test_format_conversation_empty_parts(self):
+        """A message with an empty parts list should produce empty text, not crash."""
+        conv = self._make_conversation(parts=[])
+
+        formatter = TextFormatter()
+        output = formatter.format_conversation(conv)
+
+        # Should still produce valid output with the role but no text content
+        assert "[user]" in output, "Role label should still appear for empty parts"
+
+    def test_format_conversation_single_part_unchanged(self):
+        """Regression: a single-part message should still work correctly."""
+        conv = self._make_conversation(parts=["only part"])
+
+        formatter = TextFormatter()
+        output = formatter.format_conversation(conv)
+
+        assert "only part" in output
+
+    # -- 3. Dict values must NOT be truncated --
+
+    def test_format_dict_long_value_not_truncated(self):
+        """_format_dict() must not truncate string values longer than 100 chars."""
+        long_value = "B" * 200
+        data = {"description": long_value}
+
+        formatter = TextFormatter()
+        output = formatter._format_dict(data)
+
+        assert long_value in output, (
+            "Dict value was truncated; expected full 200-char string in output"
+        )
+        assert "..." not in output, (
+            "Output contains '...' which suggests _format_dict truncation"
+        )
+
+    def test_format_dict_very_long_value_not_truncated(self):
+        """_format_dict() must preserve values of 1000+ chars."""
+        long_value = "C" * 1000
+        data = {"key": long_value}
+
+        formatter = TextFormatter()
+        output = formatter._format_dict(data)
+
+        assert long_value in output, "Very long dict value (1000 chars) was truncated"
+
+    def test_format_dict_multiple_long_values(self):
+        """_format_dict() must preserve all long values in a multi-key dict."""
+        val1 = "D" * 150
+        val2 = "E" * 250
+        data = {"first": val1, "second": val2}
+
+        formatter = TextFormatter()
+        output = formatter._format_dict(data)
+
+        assert val1 in output, "First long value was truncated"
+        assert val2 in output, "Second long value was truncated"
+
+    def test_format_dict_nested_long_values(self):
+        """_format_dict() must not truncate values in nested dicts."""
+        long_value = "F" * 300
+        data = {"outer": {"inner": long_value}}
+
+        formatter = TextFormatter()
+        output = formatter._format_dict(data)
+
+        assert long_value in output, "Nested dict value was truncated"

@@ -52,7 +52,9 @@ class BaseFormatter(ABC):
         pass
 
     @abstractmethod
-    def format_conversation(self, conv: Dict[str, Any], field_selector=None) -> str:
+    def format_conversation(
+        self, conv: Dict[str, Any], field_selector: Optional[FieldSelector] = None
+    ) -> str:
         """Format a single conversation.
 
         Args:
@@ -195,8 +197,6 @@ class TextFormatter(BaseFormatter):
                 lines.append(f"{prefix}{key}: [{len(value)} items]")
             else:
                 str_value = str(value)
-                if len(str_value) > 100:
-                    str_value = str_value[:100] + "..."
                 lines.append(f"{prefix}{key}: {str_value}")
 
         return "\n".join(lines)
@@ -215,7 +215,9 @@ class TextFormatter(BaseFormatter):
             lines.append(f"[{i}] {item}")
         return "\n".join(lines)
 
-    def format_conversation(self, conv: Dict[str, Any], field_selector=None) -> str:
+    def format_conversation(
+        self, conv: Dict[str, Any], field_selector: Optional[FieldSelector] = None
+    ) -> str:
         """Format a single conversation as text.
 
         Args:
@@ -256,12 +258,9 @@ class TextFormatter(BaseFormatter):
                     content = msg.get("content", {})
                     if isinstance(content, dict):
                         parts = content.get("parts", [])
-                        text = parts[0] if parts else ""
+                        text = "\n".join(str(p) for p in parts) if parts else ""
                     else:
                         text = str(content)
-
-                    if len(text) > 200:
-                        text = text[:200] + "..."
 
                     lines.append(f"  [{role}] {text}")
 
@@ -305,7 +304,9 @@ class JSONFormatter(BaseFormatter):
         )
         return output
 
-    def format_conversation(self, conv: Dict[str, Any], field_selector=None) -> str:
+    def format_conversation(
+        self, conv: Dict[str, Any], field_selector: Optional[FieldSelector] = None
+    ) -> str:
         """Format a single conversation as JSON.
 
         Args:
