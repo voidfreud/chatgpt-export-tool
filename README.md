@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code Style](https://img.shields.io/badge/code%20style-ruff-cyan)](https://github.com/astral-sh/ruff)
 
-A Python tool for exporting and analyzing ChatGPT `conversations.json` export files. Uses streaming JSON parsing to efficiently handle large files without loading them entirely into memory.
+A Python tool for exporting and analyzing ChatGPT `conversations.json` export files. Uses streaming JSON parsing for input handling and keeps the export pipeline modular and easy to extend.
 
 ## Overview
 
@@ -13,7 +13,7 @@ The `chatgpt-export` CLI tool parses ChatGPT conversation exports and reports:
 - Total number of conversations/threads
 - Total message count across all conversations
 - All unique field names organized by category
-- Sample conversation structure
+- File size and conversation date range
 
 ## Installation
 
@@ -24,8 +24,11 @@ The `chatgpt-export` CLI tool parses ChatGPT conversation exports and reports:
 git clone https://github.com/alexanderbass/chatgpt-export-tool.git
 cd chatgpt-export-tool
 
-# Install dependencies and package
+# Install runtime dependencies and package
 uv sync
+
+# Install development tooling too
+uv sync --group dev
 ```
 
 ### Using pip with uv
@@ -56,6 +59,9 @@ chatgpt-export export path/to/conversations.json --format txt
 
 # Export conversations to JSON format
 chatgpt-export export path/to/conversations.json --format json --output data.json
+
+# Export with an explicit field spec
+chatgpt-export export path/to/conversations.json --fields "include title,create_time"
 
 # Using uv run
 uv run chatgpt-export analyze path/to/conversations.json --verbose
@@ -97,10 +103,6 @@ The script organizes fields into these hierarchical levels:
 
 ```
 .
-├── .gitignore
-├── LICENSE
-├── README.md
-├── pyproject.toml
 ├── chatgpt_export_tool/
 │   ├── __init__.py
 │   ├── cli.py
@@ -110,13 +112,23 @@ The script organizes fields into these hierarchical levels:
 │   │   └── export.py
 │   ├── core/
 │   │   ├── __init__.py
+│   │   ├── category_fields.py
 │   │   ├── field_config.py
+│   │   ├── field_groups.py
+│   │   ├── field_selector.py
+│   │   ├── filter_pipeline.py
 │   │   ├── formatters.py
+│   │   ├── metadata_selector.py
+│   │   ├── output_writer.py
 │   │   ├── parser.py
+│   │   ├── splitter.py
 │   │   └── utils.py
-│   └── data/
 ├── tests/
-│   └── test_analyze.py  # Test suite
+│   ├── test_analyze.py
+│   ├── test_filter_pipeline.py
+│   ├── test_output_writer.py
+│   ├── test_splitter.py
+│   └── test_validators.py
 └── Fields.md            # Field reference documentation
 ```
 
@@ -133,6 +145,9 @@ uv run pytest --cov=chatgpt_export_tool --cov-report=html
 
 # Run specific test file
 uv run pytest tests/test_analyze.py -v
+
+# Run Ruff
+uv run ruff check
 ```
 
 ### Adding Dependencies
@@ -142,7 +157,7 @@ uv run pytest tests/test_analyze.py -v
 uv add ijson
 
 # Add dev dependency
-uv add --dev pytest pytest-cov
+uv add --group dev pytest pytest-cov ruff
 ```
 
 ## Contributing
@@ -167,6 +182,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Notes
 
-- Designed to handle very large JSON files (>100MB) without memory issues
+- Designed to handle very large JSON files (>100MB) with streaming input processing
+- Single-file export buffers formatted output before writing; split modes write per conversation or group
 - Field documentation is maintained in [`Fields.md`](Fields.md)
 - Requires Python 3.7 or higher

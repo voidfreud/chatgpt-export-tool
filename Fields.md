@@ -412,9 +412,9 @@ The following patterns indicate internal or experimental fields:
 - UUIDs follow the format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
 - MongoDB ObjectIds follow the format: `xxxxxxxxxxxxxxxxxxxxxxxx`
 
-## Metadata Field Filtering (--include / --exclude)
+## Metadata Field Filtering (--include / --exclude / --fields)
 
-The `analyze` and `export` commands support filtering metadata fields using `--include` and `--exclude` options. These options are **mutually exclusive** with `--fields`.
+The `export` command supports filtering metadata fields using `--include` and `--exclude`. These options can be combined with `--fields` so top-level field selection and metadata filtering stay separate. `analyze` uses `--fields` only to toggle field coverage output.
 
 ### Available Metadata Fields
 
@@ -450,28 +450,27 @@ The metadata filtering supports multiple matching strategies:
 
 ```bash
 # Include only specific metadata fields
-chatgpt export input.json --include title create_time model_slug
+chatgpt-export export input.json --include title create_time model_slug
 
 # Exclude specific metadata fields
-chatgpt export input.json --exclude plugin_ids moderation_results
+chatgpt-export export input.json --exclude plugin_ids moderation_results
 
 # Include all metadata fields (equivalent to default behavior)
-chatgpt export input.json --include "*"
+chatgpt-export export input.json --include "*"
 
 # Use with other options
-chatgpt export input.json --include "title" "create_time" --format json -o output.json
+chatgpt-export export input.json --fields "groups minimal" --include title create_time --format json -o output.json
 
 # Analyze with filtered metadata
-chatgpt analyze input.json --exclude is_archived
+chatgpt-export analyze input.json --fields
 ```
 
-### Mutual Exclusivity
+### Composition
 
-The `--include` and `--exclude` options:
-- **Cannot** be used together
-- **Cannot** be used with `--fields`
-
-Using `--fields` with `--include` or `--exclude` will result in an error.
+- `--include` and `--exclude` can be used together
+- `--fields` controls top-level field selection or field groups
+- Quote any `--fields` value that contains spaces
+- Use `analyze --fields` when you only want field coverage output
 
 ## See Also
 

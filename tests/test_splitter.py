@@ -4,9 +4,7 @@ Tests for splitter module.
 Tests SplitMode enum, SplitProcessor class, and splitting logic.
 """
 
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from chatgpt_export_tool.core.splitter import SplitMode, SplitProcessor, SplitResult
 

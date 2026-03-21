@@ -1,25 +1,14 @@
-"""
-Field selection logic.
-
-Provides FieldSelector class for handling field inclusion/exclusion
-with multiple modes (all, none, include, exclude, groups).
-
-Field groups are now defined in field_groups.py as FIELD_GROUP_MAPPING,
-providing a single source of truth.
-"""
+"""Compatibility façade for nested conversation field selection."""
 
 from typing import Any, Dict, List, Optional, Set
 
-from .category_fields import CATEGORY_FIELDS
-from .field_groups import FIELD_GROUP_MAPPING
+from .conversation_filter import ConversationFilter
+from .field_rules import categorize_fields
+from .field_spec import build_field_spec, parse_field_spec
 
 
 class FieldSelector:
-    """Handles field inclusion/exclusion with multiple modes.
-
-    Attributes:
-        MODES: Valid selection modes.
-    """
+    """Compatibility wrapper around the parsed field-spec filter."""
 
     MODES = ["all", "none", "include", "exclude", "groups"]
 
@@ -28,16 +17,16 @@ class FieldSelector:
         mode: str,
         fields: Optional[List[str]] = None,
         groups: Optional[List[str]] = None,
-    ):
-        """Initialize field selector.
+    ) -> None:
+        """Initialize a field selector.
 
         Args:
-            mode: Selection mode - "all", "none", "include", "exclude", or "groups".
-            fields: List of field names (for include/exclude modes).
-            groups: List of group names to include (for groups mode).
+            mode: Selection mode.
+            fields: Explicit fields for include/exclude modes.
+            groups: Named groups for groups mode.
 
         Raises:
-            ValueError: If mode is invalid or required parameters are missing.
+            ValueError: If the selector configuration is invalid.
         """
         if mode not in self.MODES:
             raise ValueError(f"Invalid mode: {mode}. Must be one of {self.MODES}")
@@ -46,78 +35,53 @@ class FieldSelector:
         self.fields = fields or []
         self.groups = groups or []
 
-        if mode in ("include", "exclude") and not fields:
+        if mode in {"include", "exclude"} and not fields:
             raise ValueError(f"Mode '{mode}' requires fields list")
         if mode == "groups" and not groups:
             raise ValueError("Mode 'groups' requires groups list")
 
+        self.spec = build_field_spec(
+            mode=mode,
+            fields=list(self.fields),
+            groups=list(self.groups),
+        )
+        self._filter = ConversationFilter(self.spec)
+
     @classmethod
     def from_string(cls, field_spec: str) -> "FieldSelector":
-        """Create FieldSelector from command-line string.
+        """Create a selector from a field-spec string.
 
         Args:
-            field_spec: String specification like "all", "include title,create_time",
-                       "exclude model_slug", "groups message,minimal".
+            field_spec: Field specification string.
 
         Returns:
-            Configured FieldSelector instance.
+            Configured field selector.
         """
-        parts = field_spec.split()
+        parsed_spec = parse_field_spec(field_spec)
+        return cls(
+            mode=parsed_spec.mode,
+            fields=parsed_spec.fields,
+            groups=parsed_spec.groups,
+        )
 
-        if not parts:
-            return cls(mode="all")
-
-        mode = parts[0]
-
-        if mode == "all":
-            return cls(mode="all")
-        elif mode == "none":
-            return cls(mode="none")
-        elif mode == "include":
-            fields = parts[1].split(",") if len(parts) > 1 else []
-            return cls(mode="include", fields=fields)
-        elif mode == "exclude":
-            fields = parts[1].split(",") if len(parts) > 1 else []
-            return cls(mode="exclude", fields=fields)
-        elif mode == "groups":
-            group_list = parts[1].split(",") if len(parts) > 1 else []
-            return cls(mode="groups", groups=group_list)
-        else:
-            # Assume comma-separated field names for backward compatibility
-            return cls(mode="include", fields=field_spec.split(","))
+    @property
+    def explicit_field_names(self) -> Set[str]:
+        """Return the explicit field names targeted by the selector."""
+        return self._filter.explicit_field_names
 
     def get_selected_fields(self, all_fields: Set[str]) -> Set[str]:
-        """Get the set of fields based on selection mode.
+        """Resolve the selected fields for a given dictionary.
 
         Args:
-            all_fields: Set of all available field names.
+            all_fields: Available field names in the current dictionary.
 
         Returns:
-            Set of selected field names.
+            Selected field names.
         """
-        if self.mode == "all":
-            return all_fields
-        elif self.mode == "none":
-            return set()
-        elif self.mode == "include":
-            return set(self.fields) & all_fields
-        elif self.mode == "exclude":
-            return all_fields - set(self.fields)
-        elif self.mode == "groups":
-            selected = set()
-            for group_name in self.groups:
-                # Use FIELD_GROUP_MAPPING from field_groups.py (single source of truth)
-                if group_name in FIELD_GROUP_MAPPING:
-                    selected.update(FIELD_GROUP_MAPPING[group_name])
-                else:
-                    # Try to find group in categories (for backward compatibility)
-                    if group_name in CATEGORY_FIELDS:
-                        selected.update(CATEGORY_FIELDS[group_name])
-            return selected & all_fields
-        return all_fields
+        return self._filter.get_selected_fields(all_fields)
 
     def filter_conversation(self, conv: Dict[str, Any]) -> Dict[str, Any]:
-        """Filter conversation fields.
+        """Filter a conversation, including nested mapping/message structures.
 
         Args:
             conv: Conversation dictionary.
@@ -125,43 +89,9 @@ class FieldSelector:
         Returns:
             Filtered conversation dictionary.
         """
-        all_fields = set(conv.keys())
-        selected = self.get_selected_fields(all_fields)
-        return {k: v for k, v in conv.items() if k in selected}
+        return self._filter.filter_conversation(conv)
 
     @staticmethod
     def categorize_fields(fields: Set[str]) -> Dict[str, List[str]]:
-        """Categorize field names by their hierarchical level.
-
-        Args:
-            fields: Set of all field names.
-
-        Returns:
-            Dictionary mapping category names to lists of field names.
-        """
-        categorized: Dict[str, List[str]] = {
-            "conversation": [],
-            "mapping": [],
-            "message": [],
-            "author": [],
-            "content": [],
-            "metadata": [],
-        }
-
-        # Build set of all categorized fields for fast lookup
-        all_categorized = set()
-        for cat_fields in CATEGORY_FIELDS.values():
-            all_categorized.update(cat_fields)
-
-        # Categorize each field
-        for field in sorted(fields):
-            found = False
-            for category, cat_fields in CATEGORY_FIELDS.items():
-                if field in cat_fields:
-                    categorized[category].append(field)
-                    found = True
-                    break
-            if not found:
-                categorized["metadata"].append(field)
-
-        return categorized
+        """Categorize field names by hierarchical level."""
+        return categorize_fields(fields)

@@ -1,93 +1,21 @@
-"""
-Output writing and file naming logic.
+"""Output writing and file naming logic."""
 
-Handles writing formatted conversations to disk with
-appropriate directory structure and file naming.
-"""
-
-import os
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Set
 
-from chatgpt_export_tool.core.formatters import BaseFormatter, get_formatter
+from chatgpt_export_tool.core.conversation_formatters import BaseFormatter
+from chatgpt_export_tool.core.file_naming import FileNamer
+from chatgpt_export_tool.core.output_paths import OutputPathResolver
 from chatgpt_export_tool.core.splitter import SplitMode
 from chatgpt_export_tool.core.utils import get_logger
 
-# Module-level logger for consistent naming across the codebase
 logger = get_logger()
-
-
-class FileNamer:
-    """Handles sanitization and generation of filenames from conversations."""
-
-    # Characters that are invalid in filenames across platforms
-    INVALID_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
-    MAX_LENGTH = 200
-
-    def __init__(self, max_length: int = MAX_LENGTH):
-        """Initialize file namer.
-
-        Args:
-            max_length: Maximum filename length.
-        """
-        self.max_length = max_length
-        logger.debug(f"FileNamer initialized with max_length={max_length}")
-
-    def sanitize(self, title: Optional[str]) -> str:
-        """Sanitize conversation title for use as filename.
-
-        Args:
-            title: Original conversation title.
-
-        Returns:
-            Sanitized filename-safe string.
-        """
-        if not title:
-            return "untitled"
-
-        # Replace invalid characters with underscore
-        sanitized = self.INVALID_CHARS.sub("_", title)
-        # Collapse multiple underscores
-        sanitized = re.sub(r"_+", "_", sanitized)
-        # Strip leading/trailing underscores and whitespace
-        sanitized = sanitized.strip("_").strip()
-        # Replace spaces with underscores for cleaner filenames
-        sanitized = sanitized.replace(" ", "_")
-        # Truncate if too long
-        if len(sanitized) > self.max_length:
-            sanitized = sanitized[: self.max_length - 3] + "..."
-
-        result = sanitized or "untitled"
-        logger.debug(f"sanitize('{title}') -> '{result}'")
-        return result
-
-    def get_filename(self, conv: Dict[str, Any], extension: str = "txt") -> str:
-        """Get filename for a conversation.
-
-        Args:
-            conv: Conversation dictionary.
-            extension: File extension (without dot).
-
-        Returns:
-            Sanitized filename with extension.
-        """
-        title = conv.get("title", "untitled")
-        sanitized = self.sanitize(title)
-        return f"{sanitized}.{extension}"
 
 
 @dataclass
 class WriteResult:
-    """Result of a write operation.
-
-    Attributes:
-        files_written: Number of files written.
-        directories_created: Number of directories created.
-        total_bytes: Total bytes written.
-        errors: List of error messages if any.
-    """
+    """Result of writing one or more export files."""
 
     files_written: int = 0
     directories_created: int = 0
@@ -95,12 +23,20 @@ class WriteResult:
     errors: List[str] = field(default_factory=list)
 
     def add_error(self, error: str) -> None:
-        """Add an error message."""
+        """Record a write error.
+
+        Args:
+            error: Error message.
+        """
         self.errors.append(error)
-        logger.error(f"Write error: {error}")
+        logger.error("Write error: %s", error)
 
     def merge(self, other: "WriteResult") -> None:
-        """Merge another WriteResult into this one."""
+        """Merge another write result into this one.
+
+        Args:
+            other: Result to merge.
+        """
         self.files_written += other.files_written
         self.directories_created += other.directories_created
         self.total_bytes += other.total_bytes
@@ -108,41 +44,30 @@ class WriteResult:
 
 
 class OutputWriter:
-    """Writes formatted conversations to disk.
-
-    Manages directory structure and file naming based on
-    split mode and output configuration.
-
-    Example:
-        >>> writer = OutputWriter(
-        ...     output_dir="output",
-        ...     format_type="txt",
-        ...     split_mode=SplitMode.DATE,
-        ... )
-        >>> result = writer.write_conversations(groups, formatter)
-    """
+    """Write formatted conversations to disk."""
 
     def __init__(
         self,
         output_dir: str = "output",
         format_type: str = "txt",
         split_mode: Optional[SplitMode] = None,
-    ):
-        """Initialize output writer.
+    ) -> None:
+        """Initialize an output writer.
 
         Args:
             output_dir: Base output directory.
-            format_type: Output format (txt, json).
-            split_mode: Split mode determining directory structure.
+            format_type: File format extension.
+            split_mode: Active split mode.
         """
         self.output_dir = Path(output_dir)
         self.format_type = format_type
         self.split_mode = split_mode
         self.file_namer = FileNamer()
-
-        logger.debug(
-            f"OutputWriter initialized: output_dir={output_dir}, "
-            f"format_type={format_type}, split_mode={split_mode}"
+        self.path_resolver = OutputPathResolver(
+            output_dir=self.output_dir,
+            format_type=self.format_type,
+            split_mode=self.split_mode,
+            file_namer=self.file_namer,
         )
 
     def write_conversations(
@@ -153,122 +78,117 @@ class OutputWriter:
         """Write grouped conversations to disk.
 
         Args:
-            groups: Dictionary mapping group keys to conversation lists.
-            formatter: Formatter instance for formatting conversations.
+            groups: Grouped conversations.
+            formatter: Formatter to render each conversation.
 
         Returns:
-            WriteResult with statistics.
+            Aggregate write result.
         """
         result = WriteResult()
+        used_paths: Set[Path] = set()
 
-        logger.info(f"Writing {len(groups)} groups to {self.output_dir}")
-
-        # Ensure base output directory exists before writing any files
         if self._ensure_directory(self.output_dir):
             result.directories_created += 1
-            logger.debug(f"Created base output directory: {self.output_dir}")
 
         for group_key, conversations in groups.items():
-            logger.debug(
-                f"Processing group '{group_key}' with {len(conversations)} conversations"
-            )
-
-            for conv in conversations:
+            for conversation in conversations:
                 try:
-                    filepath = self._get_filepath(conv, group_key)
-                    bytes_written = self._write_single(conv, filepath, formatter)
+                    filepath = self._get_unique_filepath(
+                        conversation, group_key, used_paths
+                    )
+                    bytes_written = self._write_single(
+                        conversation, filepath, formatter
+                    )
+                    used_paths.add(filepath)
                     result.files_written += 1
                     result.total_bytes += bytes_written
-                    logger.debug(f"Wrote {bytes_written} bytes to {filepath}")
-                except Exception as e:
-                    error_msg = (
-                        f"Error writing conversation '{conv.get('title', 'N/A')}': {e}"
+                except Exception as exc:
+                    result.add_error(
+                        f"Error writing conversation '{conversation.get('title', 'N/A')}': {exc}"
                     )
-                    result.add_error(error_msg)
 
-        logger.info(
-            f"Write complete: {result.files_written} files, "
-            f"{result.directories_created} dirs, {result.total_bytes} bytes, "
-            f"{len(result.errors)} errors"
-        )
         return result
 
     def _get_filepath(self, conv: Dict[str, Any], group_key: str) -> Path:
-        """Get the file path for a conversation.
+        """Build the target filepath for one conversation.
 
         Args:
             conv: Conversation dictionary.
-            group_key: Group key (for directory structure).
+            group_key: Resolved group key.
 
         Returns:
-            Full file path.
+            Target path.
         """
-        # Determine directory based on split mode
-        if self.split_mode == SplitMode.DATE:
-            # Use date-based subdirectory
-            dir_path = self.output_dir / group_key
-        elif self.split_mode == SplitMode.SUBJECT:
-            # Flat structure - files directly in output dir
-            dir_path = self.output_dir
-        else:
-            # Single file mode - should not be used with this writer
-            dir_path = self.output_dir
+        return self.path_resolver.get_filepath(conv, group_key)
 
-        # Get filename from conversation title
-        filename = self.file_namer.get_filename(conv, self.format_type)
-
-        return dir_path / filename
-
-    def _ensure_directory(self, dir_path: Path) -> bool:
-        """Ensure directory exists, create if needed.
+    def _resolve_target_location(
+        self,
+        conv: Dict[str, Any],
+        group_key: str,
+    ) -> tuple[Path, str]:
+        """Resolve the destination directory and filename stem.
 
         Args:
-            dir_path: Directory path to ensure exists.
+            conv: Conversation dictionary.
+            group_key: Resolved group key.
 
         Returns:
-            True if directory was created, False if it already existed.
+            Directory and filename stem tuple.
+        """
+        return self.path_resolver.resolve_target_location(conv, group_key)
+
+    def _get_unique_filepath(
+        self,
+        conv: Dict[str, Any],
+        group_key: str,
+        used_paths: Set[Path],
+    ) -> Path:
+        """Resolve a collision-safe filepath.
+
+        Args:
+            conv: Conversation dictionary.
+            group_key: Group key for the conversation.
+            used_paths: Already assigned paths for this write batch.
+
+        Returns:
+            Unique filepath for the conversation.
+        """
+        return self.path_resolver.get_unique_filepath(conv, group_key, used_paths)
+
+    def _ensure_directory(self, dir_path: Path) -> bool:
+        """Ensure a directory exists.
+
+        Args:
+            dir_path: Directory to create if needed.
+
+        Returns:
+            Whether the directory was newly created.
         """
         if dir_path.exists():
             return False
         dir_path.mkdir(parents=True, exist_ok=True)
-        logger.debug(f"Created directory: {dir_path}")
         return True
 
     def _write_single(
-        self, conv: Dict[str, Any], filepath: Path, formatter: BaseFormatter
+        self,
+        conv: Dict[str, Any],
+        filepath: Path,
+        formatter: BaseFormatter,
     ) -> int:
-        """Write a single conversation to disk.
+        """Write one conversation file.
 
         Args:
-            conv: Conversation dictionary.
+            conv: Conversation data.
             filepath: Target file path.
-            formatter: Formatter instance.
+            formatter: Formatter to render the conversation.
 
         Returns:
-            Number of bytes written.
+            Number of characters written.
         """
-        # Ensure parent directory exists
-        parent = filepath.parent
-        if self._ensure_directory(parent):
-            logger.debug(f"Created directory structure for: {filepath}")
-
-        # Format the conversation
-        formatted = formatter.format_conversation(conv)
-
-        # Ensure we write string content
-        if isinstance(formatted, bytes):
-            content = formatted.decode("utf-8")
-        else:
-            content = str(formatted)
-
-        # Write to file - ensure parent directory exists right before writing
-        # This is a defensive measure in case _ensure_directory(parent) above didn't succeed
         filepath.parent.mkdir(parents=True, exist_ok=True)
-        with open(filepath, "w", encoding="utf-8") as f:
-            bytes_written = f.write(content)
-
-        logger.debug(f"Wrote {bytes_written} bytes to {filepath}")
-        return bytes_written
+        content = formatter.format_conversation(conv)
+        with open(filepath, "w", encoding="utf-8") as handle:
+            return handle.write(content)
 
 
-__all__ = ["FileNamer", "WriteResult", "OutputWriter"]
+__all__ = ["FileNamer", "OutputWriter", "WriteResult"]

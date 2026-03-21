@@ -1,11 +1,10 @@
-"""
-Core modules for chatgpt_export_tool.
+"""Minimal public exports for core package consumers."""
 
-Provides shared functionality for parsing, field configuration, and formatting.
-"""
-
-from chatgpt_export_tool.core.field_config import FieldSelector
-from chatgpt_export_tool.core.formatters import JSONFormatter, TextFormatter
+from chatgpt_export_tool.core.conversation_formatters import (
+    JSONFormatter,
+    TextFormatter,
+)
+from chatgpt_export_tool.core.field_selector import FieldSelector
 from chatgpt_export_tool.core.parser import JSONParser
 
 __all__ = [

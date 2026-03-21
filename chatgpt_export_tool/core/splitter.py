@@ -1,16 +1,11 @@
-"""
-Conversation splitting logic.
-
-Provides SplitMode enum and SplitProcessor for dividing
-conversations into groups based on various criteria.
-"""
+"""Conversation splitting orchestration."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Iterator, List
+from typing import Any, Dict, List
 
 from chatgpt_export_tool.core.parser import JSONParser
+from chatgpt_export_tool.core.split_keys import resolve_group_key
 from chatgpt_export_tool.core.utils import get_logger
 
 # Module-level logger for consistent naming across the codebase
@@ -77,7 +72,7 @@ class SplitProcessor:
         """
         self.parser = parser
         self.mode = mode
-        logger.debug(f"SplitProcessor initialized with mode={mode.value}")
+        logger.debug("SplitProcessor initialized with mode=%s", mode.value)
 
     def process(self) -> SplitResult:
         """Process all conversations and split according to mode.
@@ -85,24 +80,26 @@ class SplitProcessor:
         Returns:
             SplitResult with grouped conversations.
         """
-        logger.info(f"Starting split processing with mode={self.mode.value}")
+        logger.info("Starting split processing with mode=%s", self.mode.value)
         groups: Dict[str, List[Dict[str, Any]]] = {}
         conversation_count = 0
 
         for conv in self.parser.iterate_conversations(verbose=self.logger.level <= 20):
             key = self._get_group_key(conv)
             logger.debug(
-                f"Conversation '{conv.get('title', 'N/A')}' -> group key '{key}'"
+                "Conversation %r -> group key %r",
+                conv.get("title", "N/A"),
+                key,
             )
 
             if key not in groups:
-                logger.debug(f"Creating new group: {key}")
+                logger.debug("Creating new group: %s", key)
                 groups[key] = []
             groups[key].append(conv)
             conversation_count += 1
 
             if conversation_count % 100 == 0:
-                logger.debug(f"Processed {conversation_count} conversations...")
+                logger.debug("Processed %s conversations...", conversation_count)
 
         result = SplitResult(
             mode=self.mode,
@@ -112,8 +109,9 @@ class SplitProcessor:
         )
 
         logger.info(
-            f"Split complete: {result.total_conversations} conversations "
-            f"into {result.group_count} groups"
+            "Split complete: %s conversations into %s groups",
+            result.total_conversations,
+            result.group_count,
         )
         return result
 
@@ -126,37 +124,7 @@ class SplitProcessor:
         Returns:
             Group key string.
         """
-        if self.mode == SplitMode.SINGLE:
-            return "all"
-
-        elif self.mode == SplitMode.SUBJECT:
-            # Each conversation is its own group
-            title = conv.get("title", "untitled")
-            conv_id = conv.get("id", conv.get("_id", "unknown"))
-            return f"{title}_{conv_id}"
-
-        elif self.mode == SplitMode.DATE:
-            # Group by creation date (daily)
-            create_time = conv.get("create_time")
-            if create_time is not None:
-                try:
-                    dt = datetime.fromtimestamp(float(create_time))
-                    return dt.strftime("%Y-%m-%d")
-                except (ValueError, OSError) as e:
-                    logger.warning(f"Could not parse create_time {create_time}: {e}")
-            return "unknown_date"
-
-        elif self.mode == SplitMode.ID:
-            # Group by conversation ID
-            # conversation_id is the primary UUID used for API calls and sharing
-            # id is a fallback, _id is the MongoDB ObjectId (least preferred)
-            conv_id = conv.get("conversation_id", conv.get("id", conv.get("_id")))
-            if conv_id is not None:
-                return str(conv_id)
-            logger.warning("Conversation has no ID field, using 'unknown_id'")
-            return "unknown_id"
-
-        return "all"
+        return resolve_group_key(self.mode, conv, logger)
 
     @property
     def logger(self):

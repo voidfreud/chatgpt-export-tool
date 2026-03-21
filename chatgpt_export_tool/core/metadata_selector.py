@@ -1,232 +1,154 @@
-"""
-Metadata field selection logic.
+"""Metadata filtering for conversations."""
 
-Provides MetadataSelector class for filtering conversation metadata
-fields with glob pattern and partial matching support.
-"""
-
-import fnmatch
+from copy import deepcopy
 from typing import Any, Dict, List, Optional, Set
 
 from .category_fields import METADATA_FIELDS
+from .metadata_rules import (
+    get_matching_metadata_fields,
+    resolve_metadata_fields_to_keep,
+)
 from .validators import ValidationResult, validate_metadata_pattern
 
 
 class MetadataSelector:
-    """Handles metadata field inclusion/exclusion with glob pattern and partial matching.
-
-    Supports:
-    - Exact field names (e.g., "title", "model_slug")
-    - Partial matching (e.g., "time" matches "create_time", "update_time")
-    - Glob patterns (e.g., "model*" matches "model_slug", "model_name")
-    - Wildcard "*" to match all metadata fields
-
-    Attributes:
-        include_fields: Set of field patterns to include.
-        exclude_fields: Set of field patterns to exclude.
-    """
+    """Filter conversation metadata using include and exclude patterns."""
 
     def __init__(
         self,
         include_fields: Optional[Set[str]] = None,
         exclude_fields: Optional[Set[str]] = None,
-    ):
-        """Initialize metadata selector.
+    ) -> None:
+        """Initialize a metadata selector.
 
         Args:
-            include_fields: Set of field patterns to include.
-            exclude_fields: Set of field patterns to exclude.
+            include_fields: Patterns to include.
+            exclude_fields: Patterns to exclude.
         """
         self.include_fields = include_fields or set()
         self.exclude_fields = exclude_fields or set()
 
     @classmethod
     def from_args(
-        cls, include: Optional[List[str]] = None, exclude: Optional[List[str]] = None
+        cls,
+        include: Optional[List[str]] = None,
+        exclude: Optional[List[str]] = None,
     ) -> "MetadataSelector":
-        """Create MetadataSelector from CLI arguments.
+        """Create a metadata selector from CLI-style arguments.
 
         Args:
-            include: List of field patterns to include.
-            exclude: List of field patterns to exclude.
+            include: Include patterns.
+            exclude: Exclude patterns.
 
         Returns:
-            Configured MetadataSelector instance.
+            Configured metadata selector.
         """
-        include_fields = set(include) if include else set()
-        exclude_fields = set(exclude) if exclude else set()
-        return cls(include_fields=include_fields, exclude_fields=exclude_fields)
-
-    def _matches_pattern(self, field_name: str, pattern: str) -> bool:
-        """Check if a field name matches a pattern.
-
-        Args:
-            field_name: The actual field name to check.
-            pattern: The pattern to match against (can be glob pattern).
-
-        Returns:
-            True if the field matches the pattern.
-        """
-        # Handle wildcard to match all
-        if pattern == "*":
-            return True
-
-        # Handle exact match
-        if field_name == pattern:
-            return True
-
-        # Handle partial match (field_name contains pattern)
-        if pattern in field_name:
-            return True
-
-        # Handle glob patterns (e.g., "model*" matches "model_slug")
-        if fnmatch.fnmatch(field_name, pattern):
-            return True
-
-        return False
-
-    def _get_matching_fields(
-        self, patterns: Set[str], available_fields: Set[str]
-    ) -> Set[str]:
-        """Get all fields that match any of the given patterns.
-
-        Args:
-            patterns: Set of field patterns to match.
-            available_fields: Set of available field names.
-
-        Returns:
-            Set of field names that match at least one pattern.
-        """
-        matching = set()
-        for pattern in patterns:
-            for field in available_fields:
-                if self._matches_pattern(field, pattern):
-                    matching.add(field)
-        return matching
+        return cls(
+            include_fields=set(include or []),
+            exclude_fields=set(exclude or []),
+        )
 
     def filter_metadata(self, conv: Dict[str, Any]) -> Dict[str, Any]:
-        """Filter conversation metadata based on include/exclude patterns.
-
-        This filters the message.metadata fields within the conversation.
-        If no include patterns are specified, all fields are considered available.
-        If no exclude patterns are specified, no fields are excluded.
+        """Filter top-level and nested message metadata.
 
         Args:
-            conv: Conversation dictionary potentially containing message metadata.
+            conv: Conversation dictionary.
 
         Returns:
-            Filtered conversation dictionary with metadata filtered.
+            Filtered conversation copy.
         """
-        result = dict(conv)
+        result = deepcopy(conv)
+        fields_to_keep = resolve_metadata_fields_to_keep(
+            self.include_fields,
+            self.exclude_fields,
+            set(METADATA_FIELDS.keys()),
+        )
 
-        # Get all metadata fields from available METADATA_FIELDS
-        available_metadata = set(METADATA_FIELDS.keys())
-
-        # Determine which fields to include
-        if self.include_fields:
-            # If include is set, only include fields matching the include patterns
-            include_matches = self._get_matching_fields(
-                self.include_fields, available_metadata
-            )
-            fields_to_keep = include_matches
-        else:
-            # If no include specified, all available metadata fields are candidates
-            fields_to_keep = available_metadata
-
-        # Apply exclusions
-        if self.exclude_fields:
-            exclude_matches = self._get_matching_fields(
-                self.exclude_fields, fields_to_keep
-            )
-            fields_to_keep -= exclude_matches
-
-        # Filter top-level conversation fields (metadata lives at conversation level)
         for key in list(result.keys()):
-            if key in available_metadata and key not in fields_to_keep:
+            if key in METADATA_FIELDS and key not in fields_to_keep:
                 del result[key]
 
-        # Also filter message metadata if present (nested metadata)
-        if "mapping" in result:
-            result["mapping"] = self._filter_mapping_metadata(
-                result["mapping"], fields_to_keep
-            )
+        mapping = result.get("mapping")
+        if isinstance(mapping, dict):
+            result["mapping"] = self._filter_mapping_metadata(mapping, fields_to_keep)
 
         return result
 
-    def _filter_mapping_metadata(
-        self, mapping: Dict[str, Any], fields_to_keep: Set[str]
-    ) -> Dict[str, Any]:
-        """Filter metadata within message nodes of the mapping.
-
-        Args:
-            mapping: The conversation mapping dictionary.
-            fields_to_keep: Set of metadata field names to keep.
-
-        Returns:
-            Filtered mapping dictionary.
-        """
-        if not isinstance(mapping, dict):
-            return mapping
-
-        filtered = {}
-        for node_id, node in mapping.items():
-            if isinstance(node, dict) and "message" in node:
-                msg = dict(node["message"]) if node["message"] else {}
-                if isinstance(msg, dict) and "metadata" in msg:
-                    metadata = msg["metadata"]
-                    if isinstance(metadata, dict):
-                        filtered_metadata = {
-                            k: v for k, v in metadata.items() if k in fields_to_keep
-                        }
-                        msg["metadata"] = filtered_metadata
-                filtered[node_id] = node
-            else:
-                filtered[node_id] = node
-        return filtered
-
     def get_included_fields(self) -> Set[str]:
-        """Get the set of fields that will be included based on current patterns.
+        """Resolve included metadata fields.
 
         Returns:
-            Set of field names that match the include patterns.
+            Included metadata field names.
         """
         if not self.include_fields:
             return set()
-        available_metadata = set(METADATA_FIELDS.keys())
-        return self._get_matching_fields(self.include_fields, available_metadata)
+        return get_matching_metadata_fields(
+            self.include_fields,
+            set(METADATA_FIELDS.keys()),
+        )
 
     def get_excluded_fields(self) -> Set[str]:
-        """Get the set of fields that will be excluded based on current patterns.
+        """Resolve excluded metadata fields.
 
         Returns:
-            Set of field names that match the exclude patterns.
+            Excluded metadata field names.
         """
         if not self.exclude_fields:
             return set()
-        available_metadata = set(METADATA_FIELDS.keys())
-        return self._get_matching_fields(self.exclude_fields, available_metadata)
+        return get_matching_metadata_fields(
+            self.exclude_fields,
+            set(METADATA_FIELDS.keys()),
+        )
 
     def validate(self) -> ValidationResult:
-        """Validate the current include/exclude patterns.
+        """Validate configured include/exclude patterns.
 
         Returns:
-            ValidationResult with any errors or warnings.
+            Validation result.
         """
         result = ValidationResult()
 
-        # Validate include patterns
         for pattern in self.include_fields:
-            pattern_result = validate_metadata_pattern(pattern)
-            result.errors.extend(pattern_result.errors)
-            result.warnings.extend(pattern_result.warnings)
+            result.merge(validate_metadata_pattern(pattern))
 
-        # Validate exclude patterns
         for pattern in self.exclude_fields:
-            pattern_result = validate_metadata_pattern(pattern)
-            result.errors.extend(pattern_result.errors)
-            result.warnings.extend(pattern_result.warnings)
-
-        if result.errors:
-            result.is_valid = False
-
+            result.merge(validate_metadata_pattern(pattern))
         return result
+
+    def _filter_mapping_metadata(
+        self,
+        mapping: Dict[str, Any],
+        fields_to_keep: Set[str],
+    ) -> Dict[str, Any]:
+        """Filter metadata in message nodes.
+
+        Args:
+            mapping: Conversation mapping dictionary.
+            fields_to_keep: Resolved metadata fields to keep.
+
+        Returns:
+            Filtered mapping copy.
+        """
+        filtered_mapping: Dict[str, Any] = {}
+
+        for node_id, node in mapping.items():
+            if not isinstance(node, dict):
+                filtered_mapping[node_id] = node
+                continue
+
+            node_copy = deepcopy(node)
+            message = node_copy.get("message")
+            if not isinstance(message, dict):
+                filtered_mapping[node_id] = node_copy
+                continue
+
+            metadata = message.get("metadata")
+            if isinstance(metadata, dict):
+                message["metadata"] = {
+                    key: value
+                    for key, value in metadata.items()
+                    if key in fields_to_keep
+                }
+            filtered_mapping[node_id] = node_copy
+
+        return filtered_mapping

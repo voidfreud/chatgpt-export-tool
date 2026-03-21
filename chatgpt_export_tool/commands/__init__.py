@@ -1,84 +1,63 @@
-"""
-Commands package for chatgpt_export_tool.
-
-Provides command implementations for analyze and export operations.
-"""
+"""Shared command infrastructure for chatgpt_export_tool."""
 
 import sys
+import traceback
 from abc import ABC, abstractmethod
 
 from chatgpt_export_tool.core.utils import get_logger, setup_logging, validate_file
 
 
 class BaseCommand(ABC):
-    """Abstract base class for command implementations.
+    """Abstract base class for command implementations."""
 
-    Provides common error handling and logging setup.
-    """
-
-    def __init__(self, filepath: str, verbose: bool = False, debug: bool = False):
-        """Initialize base command.
+    def __init__(
+        self, filepath: str, verbose: bool = False, debug: bool = False
+    ) -> None:
+        """Initialize common command state.
 
         Args:
-            filepath: Path to the JSON file to process.
-            verbose: If True, enable verbose (INFO) logging.
-            debug: If True, enable debug logging.
+            filepath: Input file path to process.
+            verbose: Whether INFO logging is enabled.
+            debug: Whether DEBUG logging is enabled.
         """
         self.filepath = filepath
-
-        # Setup logging
         setup_logging(verbose=verbose, debug=debug)
         self.logger = get_logger()
 
     def run(self) -> int:
-        """Execute the command with common error handling.
+        """Execute the command with common validation and error handling.
 
         Returns:
-            Exit code (0 for success, 1 for error).
+            Process exit code.
         """
         try:
-            self.logger.info(f"Processing file: {self.filepath}")
+            self.logger.info("Processing file: %s", self.filepath)
             validate_file(self.filepath)
             self._execute()
             return 0
-        except FileNotFoundError as e:
-            self.logger.error(f"File not found: {e}")
-            print(f"Error: {e}", file=sys.stderr)
+        except FileNotFoundError as exc:
+            self.logger.error("File not found: %s", exc)
+            print(f"Error: {exc}", file=sys.stderr)
             return 1
-        except PermissionError as e:
-            self.logger.error(f"Permission denied: {e}")
-            print(f"Error: Permission denied - {e}", file=sys.stderr)
+        except PermissionError as exc:
+            self.logger.error("Permission denied: %s", exc)
+            print(f"Error: Permission denied - {exc}", file=sys.stderr)
             return 1
         except KeyboardInterrupt:
             self.logger.info("Operation cancelled by user")
             print("\nOperation cancelled by user.", file=sys.stderr)
             return 130
-        except Exception as e:
-            self.logger.error(f"Unexpected error: {e}")
-            self.logger.debug(f"Traceback:", exc_info=True)
-            print(f"Error: Unexpected error - {e}", file=sys.stderr)
-            if self.logger.level <= 10:  # DEBUG
-                import traceback
-
+        except Exception as exc:  # pragma: no cover - defensive top-level guard
+            self.logger.error("Unexpected error: %s", exc)
+            self.logger.debug("Traceback:", exc_info=True)
+            print(f"Error: Unexpected error - {exc}", file=sys.stderr)
+            if self.logger.level <= 10:
                 traceback.print_exc()
             return 1
 
     @abstractmethod
-    def _execute(self):
-        """Execute the specific command logic.
-
-        Must be implemented by subclasses.
-        """
-        pass
+    def _execute(self) -> None:
+        """Execute the specific command logic."""
 
 
-from chatgpt_export_tool.commands.analyze import AnalyzeCommand, analyze_command
-from chatgpt_export_tool.commands.export import ExportCommand, export_command
-
-__all__ = [
-    "BaseCommand",
-    "analyze_command",
-    "AnalyzeCommand",
-    "export_command",
-    "ExportCommand",
-]
+__all__ = ["BaseCommand"]

@@ -1,14 +1,8 @@
 """Tests for chatgpt_export_tool core functionality."""
 
-import os
-import sys
-import tempfile
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import from the new package structure
 from chatgpt_export_tool.cli import create_parser, main
@@ -324,7 +318,3 @@ class TestCLIFieldsArgument:
         )
         assert args.include_fields is True
         assert args.output == "out.txt"
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

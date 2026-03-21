@@ -4,13 +4,8 @@ Tests for output_writer module.
 Tests FileNamer, WriteResult, and OutputWriter classes.
 """
 
-import os
-import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional
-from unittest.mock import MagicMock
-
-import pytest
 
 from chatgpt_export_tool.core.formatters import TextFormatter
 from chatgpt_export_tool.core.output_writer import FileNamer, OutputWriter, WriteResult

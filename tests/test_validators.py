@@ -1,7 +1,5 @@
 """Tests for validators module."""
 
-import pytest
-
 from chatgpt_export_tool.core.field_groups import FIELD_GROUP_MAPPING, FIELD_GROUPS
 from chatgpt_export_tool.core.validators import (
     FieldValidator,
@@ -243,7 +241,3 @@ class TestFieldGroupsIntegration:
         """Test that FIELD_GROUP_MAPPING is usable."""
         assert "conversation" in FIELD_GROUP_MAPPING
         assert len(FIELD_GROUP_MAPPING["conversation"]) > 0
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

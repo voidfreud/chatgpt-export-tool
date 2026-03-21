@@ -1,7 +1,5 @@
 """Tests for filter_pipeline module."""
 
-import pytest
-
 from chatgpt_export_tool.core.field_selector import FieldSelector
 from chatgpt_export_tool.core.filter_pipeline import (
     FilterConfig,
@@ -200,7 +198,3 @@ class TestFilterPipelineIntegration:
         # Validation should have run and found error
         assert result.validation is not None
         assert result.validation.is_valid is False
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
