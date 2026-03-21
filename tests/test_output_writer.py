@@ -436,7 +436,7 @@ class TestTextFormatterTruncationFix:
         formatter = TextFormatter()
         output = formatter.format_conversation(conv)
 
-        assert "[user]" not in output
+        assert "\nUser\n" not in output
 
     def test_format_conversation_single_part_unchanged(self):
         """Regression: a single-part message should still work correctly."""
@@ -472,8 +472,8 @@ class TestTextFormatterTruncationFix:
         formatter = TextFormatter()
         output = formatter.format_conversation(conv)
 
-        assert "[user] real text" in output
-        assert "[assistant]" not in output
+        assert "User\nreal text" in output
+        assert "\nAssistant\n" not in output
         assert "Messages (" not in output
 
     def test_format_conversation_uses_current_branch_and_timestamps(self):
@@ -518,5 +518,5 @@ class TestTextFormatterTruncationFix:
         assert "question" in output
         assert "final answer" in output
         assert "draft" not in output
-        assert "[user]" in output
-        assert "[assistant]" in output
+        assert "User" in output
+        assert "Assistant" in output

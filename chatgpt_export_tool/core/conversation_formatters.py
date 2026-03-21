@@ -76,17 +76,60 @@ class TextFormatter(BaseFormatter):
             lines.extend(self._render_header(conv))
             lines.append("")
 
+        context_entries = []
+        chat_entries = []
         for entry in iter_transcript_entries(conv, self.transcript_config):
-            prefix = ""
-            if (
-                self.transcript_config.include_turn_timestamps
-                and entry.timestamp is not None
-            ):
-                prefix = f"[{format_timestamp(entry.timestamp, self.text_output_config.turn_time_format)}] "
-            lines.append(f"{prefix}[{entry.role}] {entry.text}")
+            if entry.content_type == "user_editable_context":
+                context_entries.append(entry)
+            else:
+                chat_entries.append(entry)
+
+        if context_entries:
+            lines.extend(self._render_context_entries(context_entries))
+            if chat_entries:
+                lines.append("")
+
+        lines.extend(self._render_chat_entries(chat_entries))
 
         lines.append("-" * 40)
         return "\n".join(lines)
+
+    def _render_context_entries(self, entries: list[Any]) -> list[str]:
+        lines = ["Conversation Context"]
+        for entry in entries:
+            for line in entry.text.splitlines():
+                if line.strip():
+                    lines.append(line)
+        return lines
+
+    def _render_chat_entries(self, entries: list[Any]) -> list[str]:
+        lines: list[str] = []
+        for index, entry in enumerate(entries):
+            if index > 0:
+                lines.append("")
+            lines.append(self._render_turn_heading(entry))
+            lines.extend(entry.text.splitlines() or [""])
+        return lines
+
+    def _render_turn_heading(self, entry: Any) -> str:
+        role_label = self._get_role_label(entry.role, entry.content_type)
+        if (
+            self.transcript_config.include_turn_timestamps
+            and entry.timestamp is not None
+        ):
+            timestamp = format_timestamp(
+                entry.timestamp,
+                self.text_output_config.turn_time_format,
+            )
+            return f"{role_label} [{timestamp}]"
+        return role_label
+
+    def _get_role_label(self, role: str, content_type: str) -> str:
+        if role == "assistant" and content_type == "thoughts":
+            return "Assistant Thoughts"
+        if role == "assistant" and content_type == "reasoning_recap":
+            return "Assistant Reasoning"
+        return role.replace("_", " ").title()
 
     def _render_header(self, conv: Dict[str, Any]) -> list[str]:
         lines: list[str] = []
