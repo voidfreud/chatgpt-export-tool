@@ -195,6 +195,14 @@ Supported formats:
 
 By default, text export includes user text, assistant text, assistant thoughts, and user editable context when present. User editable context is rendered in a compact preview by default so transcripts stay readable. Text export hides tool plumbing, assistant code, reasoning recap, and blank/internal nodes unless the transcript policy is changed in config.
 
+Text output defaults now favor reading clarity:
+
+- conversation context is rendered as a separate preamble block
+- visible turns are grouped into clearer chat-style `User` / `Assistant` sections
+- turn counts can be shown in the header
+- ChatGPT citation/navigation artifacts can be stripped from text output
+- long paragraphs can be wrapped for easier reading
+
 Important transcript policy options include:
 
 - `user_editable_context_mode`
@@ -212,7 +220,17 @@ The config file is TOML and is intentionally kept to one file with sections such
 
 - `[defaults]` for format, split mode, field selection, and output directory
 - `[transcript]` for active-branch reconstruction and visibility rules
-- `[text_output]` for header fields and date/time formats
+- `[text_output]` for header fields, transcript layout, and date/time formats
+
+Notable `[text_output]` options include:
+
+- `layout_mode = "reading" | "compact"`
+- `heading_style = "plain" | "markdown"`
+- `include_turn_count_in_header = true | false`
+- `include_turn_numbers = true | false`
+- `turn_separator = "---"`
+- `strip_chatgpt_artifacts = true | false`
+- `wrap_width = 88`
 
 CLI arguments override TOML values. `analyze` does not currently use export config defaults.
 

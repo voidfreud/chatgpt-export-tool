@@ -1,6 +1,6 @@
 """Semantic validation for runtime configuration."""
 
-from .config_models import DefaultsConfig, TranscriptConfig
+from .config_models import DefaultsConfig, TextOutputConfig, TranscriptConfig
 from .field_validation import FieldValidator
 from .metadata_validation import validate_metadata_patterns
 from .splitter import SplitMode
@@ -57,4 +57,21 @@ def validate_transcript_config(transcript: TranscriptConfig) -> None:
         raise ValueError(
             "Transcript content types cannot be both included and excluded: "
             + ", ".join(sorted(overlap))
+        )
+
+
+def validate_text_output_config(text_output: TextOutputConfig) -> None:
+    """Validate text output rendering settings."""
+    valid_layout_modes = {"compact", "reading"}
+    if text_output.layout_mode not in valid_layout_modes:
+        raise ValueError(
+            "Config value 'layout_mode' must be one of: "
+            + ", ".join(sorted(valid_layout_modes))
+        )
+
+    valid_heading_styles = {"plain", "markdown"}
+    if text_output.heading_style not in valid_heading_styles:
+        raise ValueError(
+            "Config value 'heading_style' must be one of: "
+            + ", ".join(sorted(valid_heading_styles))
         )

@@ -1,7 +1,10 @@
 """Conversation output formatters."""
 
 import json
+import re
+import textwrap
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Dict, Optional
 
@@ -14,6 +17,15 @@ from chatgpt_export_tool.core.thread_transcript import iter_transcript_entries
 from chatgpt_export_tool.core.utils import format_timestamp, get_logger
 
 logger = get_logger()
+CHATGPT_ARTIFACT_RE = re.compile(r"[^]*")
+
+
+@dataclass(frozen=True)
+class TurnBlock:
+    """One rendered transcript turn after grouping."""
+
+    heading: str
+    text: str
 
 
 def _json_default(value: Any) -> Any:
@@ -89,31 +101,81 @@ class TextFormatter(BaseFormatter):
             if chat_entries:
                 lines.append("")
 
-        lines.extend(self._render_chat_entries(chat_entries))
+        turn_blocks = self._group_chat_entries(chat_entries)
+        if (
+            turn_blocks
+            and self.include_header
+            and self.text_output_config.include_turn_count_in_header
+        ):
+            header_index = self._find_header_insert_index(lines)
+            lines.insert(header_index, f"Turns: {len(turn_blocks)}")
+            lines.insert(header_index + 1, "")
+
+        lines.extend(self._render_chat_entries(turn_blocks))
 
         lines.append("-" * 40)
         return "\n".join(lines)
 
+    def _find_header_insert_index(self, lines: list[str]) -> int:
+        try:
+            return lines.index("")
+        except ValueError:
+            return len(lines)
+
     def _render_context_entries(self, entries: list[Any]) -> list[str]:
-        lines = ["Conversation Context"]
+        lines = [self._render_section_heading("Conversation Context")]
         for entry in entries:
-            for line in entry.text.splitlines():
+            for line in self._prepare_text(entry.text).splitlines():
                 if line.strip():
-                    lines.append(line)
+                    lines.append(f"{self.indent}{line}")
         return lines
 
-    def _render_chat_entries(self, entries: list[Any]) -> list[str]:
+    def _group_chat_entries(self, entries: list[Any]) -> list[TurnBlock]:
+        blocks: list[TurnBlock] = []
+        current_heading: Optional[str] = None
+        current_parts: list[str] = []
+
+        for index, entry in enumerate(entries, start=1):
+            heading = self._render_turn_heading(entry, turn_number=index)
+            prepared_text = self._prepare_text(entry.text)
+            if current_heading == heading:
+                current_parts.append(prepared_text)
+                continue
+            if current_heading is not None:
+                blocks.append(TurnBlock(current_heading, "\n\n".join(current_parts)))
+            current_heading = heading
+            current_parts = [prepared_text]
+
+        if current_heading is not None:
+            blocks.append(TurnBlock(current_heading, "\n\n".join(current_parts)))
+        return blocks
+
+    def _render_chat_entries(self, entries: list[TurnBlock]) -> list[str]:
         lines: list[str] = []
         for index, entry in enumerate(entries):
             if index > 0:
                 lines.append("")
-            lines.append(self._render_turn_heading(entry))
-            body_lines = entry.text.splitlines() or [""]
-            lines.extend(f"{self.indent}{line}" if line else self.indent for line in body_lines)
+                if (
+                    self.text_output_config.layout_mode == "reading"
+                    and self.text_output_config.turn_separator
+                ):
+                    lines.append(self.text_output_config.turn_separator)
+                    lines.append("")
+            lines.append(entry.heading)
+            body_lines = self._wrap_body_lines(entry.text)
+            if self.text_output_config.layout_mode == "compact":
+                if body_lines:
+                    first_line = body_lines[0].lstrip()
+                    lines[-1] = f"{entry.heading} {first_line}".rstrip()
+                    lines.extend(body_lines[1:])
+                continue
+            lines.extend(body_lines)
         return lines
 
-    def _render_turn_heading(self, entry: Any) -> str:
+    def _render_turn_heading(self, entry: Any, *, turn_number: int) -> str:
         role_label = self._get_role_label(entry.role, entry.content_type)
+        if self.text_output_config.include_turn_numbers:
+            role_label = f"Turn {turn_number} · {role_label}"
         if (
             self.transcript_config.include_turn_timestamps
             and entry.timestamp is not None
@@ -122,8 +184,13 @@ class TextFormatter(BaseFormatter):
                 entry.timestamp,
                 self.text_output_config.turn_time_format,
             )
-            return f"{role_label} [{timestamp}]:"
-        return f"{role_label}:"
+            heading = f"{role_label} [{timestamp}]"
+        else:
+            heading = role_label
+
+        if self.text_output_config.heading_style == "markdown":
+            return f"## {heading}"
+        return f"{heading}:"
 
     def _get_role_label(self, role: str, content_type: str) -> str:
         if role == "assistant" and content_type == "thoughts":
@@ -131,6 +198,64 @@ class TextFormatter(BaseFormatter):
         if role == "assistant" and content_type == "reasoning_recap":
             return "Assistant Reasoning"
         return role.replace("_", " ").title()
+
+    def _prepare_text(self, text: str) -> str:
+        prepared = text
+        if self.text_output_config.strip_chatgpt_artifacts:
+            prepared = CHATGPT_ARTIFACT_RE.sub("", prepared)
+            prepared = re.sub(r"\n{3,}", "\n\n", prepared)
+        return prepared.strip()
+
+    def _render_section_heading(self, title: str) -> str:
+        if self.text_output_config.heading_style == "markdown":
+            return f"## {title}"
+        return title
+
+    def _wrap_body_lines(self, text: str) -> list[str]:
+        indent = (
+            "" if self.text_output_config.heading_style == "markdown" else self.indent
+        )
+        width = self.text_output_config.wrap_width
+        rendered: list[str] = []
+
+        for raw_line in text.splitlines() or [""]:
+            if not raw_line.strip():
+                rendered.append("")
+                continue
+
+            if width <= 0:
+                rendered.append(f"{indent}{raw_line}" if indent else raw_line)
+                continue
+
+            if self._is_structured_line(raw_line):
+                fill = textwrap.fill(
+                    raw_line,
+                    width=width,
+                    initial_indent=indent,
+                    subsequent_indent=f"{indent}  " if indent else "  ",
+                    replace_whitespace=False,
+                    drop_whitespace=False,
+                )
+            else:
+                fill = textwrap.fill(
+                    raw_line,
+                    width=width,
+                    initial_indent=indent,
+                    subsequent_indent=indent,
+                    replace_whitespace=False,
+                    drop_whitespace=False,
+                )
+            rendered.extend(fill.splitlines())
+        return rendered
+
+    def _is_structured_line(self, line: str) -> bool:
+        stripped = line.lstrip()
+        if not stripped:
+            return False
+        if stripped.startswith(("```", "#", ">", "- ", "* ", "+ ")):
+            return True
+        prefix, _, suffix = stripped.partition(". ")
+        return prefix.isdigit() and bool(suffix)
 
     def _render_header(self, conv: Dict[str, Any]) -> list[str]:
         lines: list[str] = []

@@ -18,6 +18,7 @@ from .config_models import (
 from .config_validation import (
     validate_defaults_config,
     validate_metadata_defaults,
+    validate_text_output_config,
     validate_transcript_config,
 )
 from .logging_utils import get_logger
@@ -164,7 +165,7 @@ def _load_transcript(section: Any) -> TranscriptConfig:
 def _load_text_output(section: Any) -> TextOutputConfig:
     section = _expect_table(section, "text_output")
     defaults = TextOutputConfig()
-    return TextOutputConfig(
+    text_output = TextOutputConfig(
         include_header=_get_bool(section, "include_header", defaults.include_header),
         header_fields=_get_str_list(section, "header_fields", defaults.header_fields),
         conversation_time_format=_get_str(
@@ -177,7 +178,37 @@ def _load_text_output(section: Any) -> TextOutputConfig:
             "turn_time_format",
             defaults.turn_time_format,
         ),
+        layout_mode=_get_str(section, "layout_mode", defaults.layout_mode),
+        heading_style=_get_str(section, "heading_style", defaults.heading_style),
+        include_turn_count_in_header=_get_bool(
+            section,
+            "include_turn_count_in_header",
+            defaults.include_turn_count_in_header,
+        ),
+        include_turn_numbers=_get_bool(
+            section,
+            "include_turn_numbers",
+            defaults.include_turn_numbers,
+        ),
+        turn_separator=_get_str(
+            section,
+            "turn_separator",
+            defaults.turn_separator,
+        ),
+        strip_chatgpt_artifacts=_get_bool(
+            section,
+            "strip_chatgpt_artifacts",
+            defaults.strip_chatgpt_artifacts,
+        ),
+        wrap_width=_get_int(
+            section,
+            "wrap_width",
+            defaults.wrap_width,
+            minimum=0,
+        ),
     )
+    validate_text_output_config(text_output)
+    return text_output
 
 
 def _expect_table(section: Any, section_name: str) -> dict[str, Any]:

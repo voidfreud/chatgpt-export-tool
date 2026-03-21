@@ -53,6 +53,13 @@ class TextOutputConfig:
     header_fields: tuple[str, ...] = ("title", "id", "create_time")
     conversation_time_format: str = DEFAULT_TIME_FORMAT
     turn_time_format: str = DEFAULT_TIME_FORMAT
+    layout_mode: str = "reading"
+    heading_style: str = "plain"
+    include_turn_count_in_header: bool = True
+    include_turn_numbers: bool = False
+    turn_separator: str = "---"
+    strip_chatgpt_artifacts: bool = True
+    wrap_width: int = 88
 
 
 @dataclass(frozen=True)

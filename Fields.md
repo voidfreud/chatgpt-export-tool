@@ -226,3 +226,4 @@ chatgpt-export export data.json --split subject --output-dir exports --fields "g
 - Default text export shows user text, assistant text, assistant thoughts, and a compact preview of `user_editable_context`.
 - Default text export hides assistant code, reasoning recap, and tool plumbing unless the transcript policy explicitly enables them.
 - Advanced transcript controls include `user_editable_context_mode`, `show_visually_hidden_content_types`, `include_content_types`, and `exclude_content_types`.
+- Text layout controls include `layout_mode`, `heading_style`, `include_turn_count_in_header`, `include_turn_numbers`, `turn_separator`, `strip_chatgpt_artifacts`, and `wrap_width`.

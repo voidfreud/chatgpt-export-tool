@@ -388,9 +388,10 @@ class TestTextFormatterTruncationFix:
 
         formatter = TextFormatter()
         output = formatter.format_conversation(conv)
+        normalized_output = output.replace("\n", "").replace(" ", "")
 
         # The full text must be present — not just the first 200 chars + "..."
-        assert long_text in output, (
+        assert long_text in normalized_output, (
             "Message content was truncated; expected full 500-char string in output"
         )
 
@@ -401,8 +402,11 @@ class TestTextFormatterTruncationFix:
 
         formatter = TextFormatter()
         output = formatter.format_conversation(conv)
+        normalized_output = output.replace("\n", "").replace(" ", "")
 
-        assert long_text in output, "Very long message (2000 chars) was truncated"
+        assert long_text in normalized_output, (
+            "Very long message (2000 chars) was truncated"
+        )
 
     # -- 2. Multi-part messages must be fully captured --
 

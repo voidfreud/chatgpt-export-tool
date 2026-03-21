@@ -225,3 +225,47 @@ include_metadata = ["unknown_metadata"]
     captured = capsys.readouterr()
     assert config.defaults.include_metadata == ("unknown_metadata",)
     assert "matches no known metadata fields" in captured.err
+
+
+def test_load_runtime_config_parses_text_layout_options(tmp_path: Path) -> None:
+    """Text output layout options should load from TOML."""
+    config_path = tmp_path / "layout.toml"
+    config_path.write_text(
+        """
+[text_output]
+layout_mode = "compact"
+heading_style = "markdown"
+include_turn_count_in_header = false
+include_turn_numbers = true
+turn_separator = "***"
+strip_chatgpt_artifacts = false
+wrap_width = 120
+""".strip(),
+        encoding="utf-8",
+    )
+
+    config = load_runtime_config(str(config_path))
+
+    assert config.text_output.layout_mode == "compact"
+    assert config.text_output.heading_style == "markdown"
+    assert config.text_output.include_turn_count_in_header is False
+    assert config.text_output.include_turn_numbers is True
+    assert config.text_output.turn_separator == "***"
+    assert config.text_output.strip_chatgpt_artifacts is False
+    assert config.text_output.wrap_width == 120
+
+
+def test_load_runtime_config_rejects_invalid_text_output_values(tmp_path: Path) -> None:
+    """Invalid text output semantics should fail during config loading."""
+    config_path = tmp_path / "broken-layout.toml"
+    config_path.write_text(
+        """
+[text_output]
+layout_mode = "wide"
+heading_style = "html"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError):
+        load_runtime_config(str(config_path))
