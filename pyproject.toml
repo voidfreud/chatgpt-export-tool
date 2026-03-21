@@ -1,6 +1,6 @@
 [project]
 name = "chatgpt-export-tool"
-version = "0.1"
+version = "0.5"
 description = "A Python tool for exporting and analyzing ChatGPT conversations.json export files"
 readme = "README.md"
 license = "MIT"

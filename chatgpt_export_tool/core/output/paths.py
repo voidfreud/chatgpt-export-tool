@@ -3,8 +3,11 @@
 from pathlib import Path
 from typing import Any, Dict, Optional, Set
 
-from .conversation_access import get_conversation_title, get_subject_filename_stem
-from .file_naming import FileNamer
+from chatgpt_export_tool.core.transcript.access import (
+    get_conversation_title,
+    get_subject_filename_stem,
+)
+from .naming import FileNamer
 from chatgpt_export_tool.core.splitter import SplitMode
 
 

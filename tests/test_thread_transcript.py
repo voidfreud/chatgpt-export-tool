@@ -1,7 +1,7 @@
 """Tests for transcript extraction and visibility rules."""
 
-from chatgpt_export_tool.core.runtime_config import TranscriptConfig
-from chatgpt_export_tool.core.thread_transcript import (
+from chatgpt_export_tool.core.config.runtime import TranscriptConfig
+from chatgpt_export_tool.core.transcript.thread import (
     extract_message_text,
     iter_branch_messages,
     iter_transcript_entries,

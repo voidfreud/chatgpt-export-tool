@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from chatgpt_export_tool.core.field_rules import categorize_fields
-from chatgpt_export_tool.core.utils import format_timestamp, get_logger
+from chatgpt_export_tool.core.logging_utils import get_logger
+from chatgpt_export_tool.core.utils import format_timestamp
 
 logger = get_logger()
 

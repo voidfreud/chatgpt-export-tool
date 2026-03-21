@@ -2,9 +2,9 @@
 
 from typing import List
 
-from .category_fields import METADATA_FIELDS
-from .metadata_rules import get_matching_metadata_fields
-from .validation_models import ValidationResult
+from chatgpt_export_tool.core.category_fields import METADATA_FIELDS
+from chatgpt_export_tool.core.metadata_rules import get_matching_metadata_fields
+from .models import ValidationResult
 
 
 def validate_metadata_pattern(pattern: str) -> ValidationResult:

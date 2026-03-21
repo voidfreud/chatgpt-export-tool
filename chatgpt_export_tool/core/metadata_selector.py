@@ -52,17 +52,21 @@ class MetadataSelector:
         Returns:
             Filtered conversation dictionary.
         """
-        fields_to_keep = resolve_metadata_fields_to_keep(
-            self.include_fields,
-            self.exclude_fields,
-            set(METADATA_FIELDS.keys()),
-        )
+        fields_to_keep = self.resolve_fields_to_keep()
 
         mapping = conv.get("mapping")
         if isinstance(mapping, dict):
             self._filter_mapping_metadata(mapping, fields_to_keep)
 
         return conv
+
+    def resolve_fields_to_keep(self) -> Set[str]:
+        """Resolve the effective metadata field names to keep."""
+        return resolve_metadata_fields_to_keep(
+            self.include_fields,
+            self.exclude_fields,
+            set(METADATA_FIELDS.keys()),
+        )
 
     def _filter_mapping_metadata(
         self,

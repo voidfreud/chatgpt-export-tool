@@ -1,6 +1,6 @@
 """Tests for atomic conversation-access helpers."""
 
-from chatgpt_export_tool.core.conversation_access import (
+from chatgpt_export_tool.core.transcript.access import (
     get_conversation_title,
     get_date_group_key,
     get_display_conversation_id,

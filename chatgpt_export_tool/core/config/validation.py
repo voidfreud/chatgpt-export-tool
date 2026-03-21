@@ -1,10 +1,10 @@
 """Semantic validation for runtime configuration."""
 
-from .config_models import DefaultsConfig, TextOutputConfig, TranscriptConfig
-from .field_validation import FieldValidator
-from .metadata_validation import validate_metadata_patterns
-from .splitter import SplitMode
-from .validation_models import ValidationResult
+from .models import DefaultsConfig, TextOutputConfig, TranscriptConfig
+from chatgpt_export_tool.core.splitter import SplitMode
+from chatgpt_export_tool.core.validation.fields import FieldValidator
+from chatgpt_export_tool.core.validation.metadata import validate_metadata_patterns
+from chatgpt_export_tool.core.validation.models import ValidationResult
 
 
 def validate_defaults_config(defaults: DefaultsConfig) -> None:

@@ -2,8 +2,8 @@
 
 import pytest
 
-from chatgpt_export_tool.core.config_models import DefaultsConfig, TranscriptConfig
-from chatgpt_export_tool.core.config_validation import (
+from chatgpt_export_tool.core.config.models import DefaultsConfig, TranscriptConfig
+from chatgpt_export_tool.core.config.validation import (
     validate_defaults_config,
     validate_transcript_config,
 )

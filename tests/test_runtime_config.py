@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from chatgpt_export_tool.core.logging_utils import setup_logging
-from chatgpt_export_tool.core.runtime_config import (
+from chatgpt_export_tool.core.config.runtime import (
     DEFAULT_CONFIG_FILENAME,
     load_runtime_config,
 )
+from chatgpt_export_tool.core.logging_utils import setup_logging
 
 
 def test_load_runtime_config_defaults_when_no_file(

@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-from chatgpt_export_tool.core.file_naming import FileNamer
-from chatgpt_export_tool.core.output_paths import OutputPathResolver
+from chatgpt_export_tool.core.output.naming import FileNamer
+from chatgpt_export_tool.core.output.paths import OutputPathResolver
 from chatgpt_export_tool.core.splitter import SplitMode
 
 

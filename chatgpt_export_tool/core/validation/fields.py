@@ -3,11 +3,11 @@
 import re
 from typing import List, Set
 
-from .category_fields import CATEGORY_FIELDS, METADATA_FIELDS
-from .field_groups import FIELD_GROUPS
-from .field_spec import FIELD_SELECTION_MODES, parse_field_spec
-from .name_matching import find_similar_names, match_names
-from .validation_models import ValidationResult
+from chatgpt_export_tool.core.category_fields import CATEGORY_FIELDS, METADATA_FIELDS
+from chatgpt_export_tool.core.field_groups import FIELD_GROUPS
+from chatgpt_export_tool.core.field_spec import FIELD_SELECTION_MODES, parse_field_spec
+from chatgpt_export_tool.core.name_matching import find_similar_names, match_names
+from .models import ValidationResult
 
 
 class FieldValidator:

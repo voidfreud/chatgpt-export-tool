@@ -3,7 +3,7 @@
 import re
 from typing import Any, Optional
 
-from .conversation_access import get_conversation_title
+from chatgpt_export_tool.core.transcript.access import get_conversation_title
 
 
 class FileNamer:

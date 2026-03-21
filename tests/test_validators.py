@@ -1,10 +1,11 @@
 """Tests for validators module."""
 
+import pytest
+
 from chatgpt_export_tool.core.field_groups import FIELD_GROUP_MAPPING, FIELD_GROUPS
-from chatgpt_export_tool.core.validators import (
+from chatgpt_export_tool.core.validation import (
     FieldValidator,
     ValidationResult,
-    validate_field_spec,
     validate_metadata_pattern,
 )
 
@@ -193,21 +194,24 @@ class TestFieldValidator:
         # Should find "title"
         assert "title" in similar
 
+    def test_field_selector_rejects_invalid_mode_and_missing_arguments(self):
+        """FieldSelector should preserve its public validation behavior."""
+        from chatgpt_export_tool.core.field_selector import FieldSelector
+
+        with pytest.raises(ValueError):
+            FieldSelector(mode="invalid")
+        with pytest.raises(ValueError):
+            FieldSelector(mode="include")
+        with pytest.raises(ValueError):
+            FieldSelector(mode="groups")
+
 
 class TestModuleFunctions:
-    """Test module-level convenience functions."""
-
-    def test_get_validator_returns_singleton(self):
-        """Test that get_validator returns singleton."""
-        from chatgpt_export_tool.core.validators import get_validator
-
-        v1 = get_validator()
-        v2 = get_validator()
-        assert v1 is v2
+    """Test convenience usage through the validation package."""
 
     def test_validate_field_spec_convenience(self):
-        """Test validate_field_spec convenience function."""
-        result = validate_field_spec("all")
+        """Test field-spec validation through the validator instance."""
+        result = FieldValidator().validate_field_spec("all")
         assert result.is_valid is True
 
     def test_validate_metadata_pattern_known(self):

@@ -1,14 +1,19 @@
-"""Compatibility façade for nested conversation field selection."""
+"""Public façade for structural conversation field selection."""
 
 from typing import Any, Dict, List, Optional, Set
 
 from .conversation_filter import ConversationFilter
 from .field_rules import categorize_fields
-from .field_spec import FIELD_SELECTION_MODES, build_field_spec, parse_field_spec
+from .field_spec import (
+    FIELD_SELECTION_MODES,
+    FieldSpec,
+    build_field_spec,
+    parse_field_spec,
+)
 
 
 class FieldSelector:
-    """Compatibility wrapper around the parsed field-spec filter."""
+    """Small public wrapper around a normalized field specification."""
 
     def __init__(
         self,
@@ -31,10 +36,6 @@ class FieldSelector:
                 f"Invalid mode: {mode}. Must be one of {list(FIELD_SELECTION_MODES)}"
             )
 
-        self.mode = mode
-        self.fields = fields or []
-        self.groups = groups or []
-
         if mode in {"include", "exclude"} and not fields:
             raise ValueError(f"Mode '{mode}' requires fields list")
         if mode == "groups" and not groups:
@@ -42,10 +43,15 @@ class FieldSelector:
 
         self.spec = build_field_spec(
             mode=mode,
-            fields=list(self.fields),
-            groups=list(self.groups),
+            fields=list(fields or []),
+            groups=list(groups or []),
         )
         self._filter = ConversationFilter(self.spec)
+
+    @classmethod
+    def from_spec(cls, spec: FieldSpec) -> "FieldSelector":
+        """Create a selector from a normalized field specification."""
+        return cls(mode=spec.mode, fields=spec.fields, groups=spec.groups)
 
     @classmethod
     def from_string(cls, field_spec: str) -> "FieldSelector":
@@ -57,12 +63,22 @@ class FieldSelector:
         Returns:
             Configured field selector.
         """
-        parsed_spec = parse_field_spec(field_spec)
-        return cls(
-            mode=parsed_spec.mode,
-            fields=parsed_spec.fields,
-            groups=parsed_spec.groups,
-        )
+        return cls.from_spec(parse_field_spec(field_spec))
+
+    @property
+    def mode(self) -> str:
+        """Return the normalized selection mode."""
+        return self.spec.mode
+
+    @property
+    def fields(self) -> List[str]:
+        """Return the normalized explicit field list."""
+        return list(self.spec.fields)
+
+    @property
+    def groups(self) -> List[str]:
+        """Return the normalized explicit group list."""
+        return list(self.spec.groups)
 
     @property
     def explicit_field_names(self) -> Set[str]:

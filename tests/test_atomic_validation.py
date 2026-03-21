@@ -1,8 +1,8 @@
 """Tests for the new atomic validation modules."""
 
-from chatgpt_export_tool.core.field_validation import FieldValidator
-from chatgpt_export_tool.core.metadata_validation import validate_metadata_patterns
-from chatgpt_export_tool.core.validation_models import ValidationResult
+from chatgpt_export_tool.core.validation.fields import FieldValidator
+from chatgpt_export_tool.core.validation.metadata import validate_metadata_patterns
+from chatgpt_export_tool.core.validation.models import ValidationResult
 
 
 def test_validation_result_module_is_stable() -> None:

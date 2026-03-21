@@ -2,7 +2,7 @@
 
 from typing import Any, Dict
 
-from .conversation_access import iter_mapping_nodes, iter_messages
+from .transcript.access import iter_mapping_nodes, iter_messages
 
 
 class AnalysisCollector:

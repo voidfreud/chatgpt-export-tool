@@ -1,6 +1,6 @@
 """Minimal public exports for core package consumers."""
 
-from chatgpt_export_tool.core.conversation_formatters import (
+from chatgpt_export_tool.core.output.formatters import (
     JSONFormatter,
     TextFormatter,
 )

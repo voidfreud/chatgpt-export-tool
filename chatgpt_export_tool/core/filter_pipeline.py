@@ -4,12 +4,14 @@ from typing import Any, Dict, List, Optional
 
 from .filter_models import FilterConfig
 from .field_selector import FieldSelector
-from .metadata_selector import MetadataSelector
 from .logging_utils import get_logger
-from .metadata_validation import validate_metadata_patterns
-from .validators import ValidationResult, get_validator
+from .metadata_selector import MetadataSelector
+from .validation.fields import FieldValidator
+from .validation.metadata import validate_metadata_patterns
+from .validation.models import ValidationResult
 
 logger = get_logger()
+_FIELD_VALIDATOR = FieldValidator()
 
 
 class FilterPipeline:
@@ -51,7 +53,7 @@ class FilterPipeline:
         """
         validation: Optional[ValidationResult] = None
         if config.validate:
-            validation = get_validator().validate_field_spec(config.field_spec)
+            validation = _FIELD_VALIDATOR.validate_field_spec(config.field_spec)
             if not validation.is_valid and raise_on_invalid:
                 raise ValueError(
                     f"Invalid field spec: {config.field_spec}. Errors: {validation.errors}"

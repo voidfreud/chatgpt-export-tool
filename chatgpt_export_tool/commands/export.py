@@ -6,8 +6,8 @@ from typing import Optional
 
 from chatgpt_export_tool.commands import BaseCommand
 from chatgpt_export_tool.commands.options import add_logging_arguments
+from chatgpt_export_tool.core.config.runtime import load_runtime_config
 from chatgpt_export_tool.core.export_service import ExportConfig, ExportService
-from chatgpt_export_tool.core.runtime_config import load_runtime_config
 from chatgpt_export_tool.core.splitter import SplitMode
 
 

@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Any, Dict, Iterator, Optional
 
-from .runtime_config import TranscriptConfig
+from chatgpt_export_tool.core.config.runtime import TranscriptConfig
 
 
 @dataclass(frozen=True)

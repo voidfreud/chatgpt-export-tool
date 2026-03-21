@@ -7,14 +7,14 @@ Tests FileNamer, WriteResult, and OutputWriter classes.
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from chatgpt_export_tool.core.conversation_formatters import TextFormatter
-from chatgpt_export_tool.core.output_writer import (
+from chatgpt_export_tool.core.output.formatters import TextFormatter
+from chatgpt_export_tool.core.output.paths import OutputPathResolver
+from chatgpt_export_tool.core.output.writer import (
     FileNamer,
     OutputWriter,
     WriteJob,
     WriteResult,
 )
-from chatgpt_export_tool.core.output_paths import OutputPathResolver
 from chatgpt_export_tool.core.splitter import SplitMode
 
 

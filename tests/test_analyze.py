@@ -10,9 +10,10 @@ from chatgpt_export_tool.core.analysis_formatter import (
     AnalyzeConfig,
     format_analysis_text,
 )
+from chatgpt_export_tool.core.file_utils import get_file_size
 from chatgpt_export_tool.core.field_selector import FieldSelector
 from chatgpt_export_tool.core.parser import JSONParser
-from chatgpt_export_tool.core.utils import format_size, get_file_size
+from chatgpt_export_tool.core.utils import format_size
 
 
 class TestImportModule:

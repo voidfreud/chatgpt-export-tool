@@ -232,6 +232,36 @@ Notable `[text_output]` options include:
 - `strip_chatgpt_artifacts = true | false`
 - `wrap_width = 88`
 
+Practical transcript presets:
+
+Reading-first transcript:
+```toml
+[text_output]
+layout_mode = "reading"
+heading_style = "plain"
+include_turn_count_in_header = true
+turn_separator = "---"
+strip_chatgpt_artifacts = true
+wrap_width = 88
+```
+
+Compact scanning transcript:
+```toml
+[text_output]
+layout_mode = "compact"
+include_turn_count_in_header = false
+turn_separator = ""
+wrap_width = 0
+```
+
+Markdown/notes transcript:
+```toml
+[text_output]
+layout_mode = "reading"
+heading_style = "markdown"
+turn_separator = "---"
+```
+
 CLI arguments override TOML values. `analyze` does not currently use export config defaults.
 
 ## Architecture
@@ -242,6 +272,13 @@ The structure is intentionally modular at the subsystem level:
 - streaming parse and analysis are separate from export formatting and writing
 - structural field filtering and metadata filtering are separate concerns
 - split-key resolution, filename policy, and writing are isolated from export orchestration
+
+The core package is also grouped into shallow subpackages by concern:
+
+- `core/config/` for runtime config models, loading, and validation
+- `core/transcript/` for branch reconstruction and transcript extraction
+- `core/validation/` for field and metadata validation
+- `core/output/` for formatting, naming, path resolution, and writing
 
 That separation is deliberate: most behavior changes can be made in one small subsystem instead of in one large control file.
 

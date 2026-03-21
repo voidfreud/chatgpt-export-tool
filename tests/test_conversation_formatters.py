@@ -1,7 +1,7 @@
 """Tests for conversation text formatting."""
 
-from chatgpt_export_tool.core.conversation_formatters import TextFormatter
-from chatgpt_export_tool.core.runtime_config import TextOutputConfig, TranscriptConfig
+from chatgpt_export_tool.core.config.runtime import TextOutputConfig, TranscriptConfig
+from chatgpt_export_tool.core.output.formatters import TextFormatter
 from chatgpt_export_tool.core.utils import format_timestamp
 
 
@@ -235,3 +235,43 @@ def test_text_formatter_groups_consecutive_same_speaker_turns() -> None:
     assert output.count("Assistant [") == 1
     assert "  first" in output
     assert "  second" in output
+
+
+def test_text_formatter_keeps_context_entries_out_of_turn_count() -> None:
+    """Context preamble should not inflate the visible chat-turn count."""
+    conversation = {
+        "title": "Transcript",
+        "id": "conv-1",
+        "current_node": "assistant",
+        "mapping": {
+            "context": {
+                "parent": None,
+                "message": {
+                    "author": {"role": "user"},
+                    "content": {
+                        "content_type": "user_editable_context",
+                        "user_profile": "profile",
+                    },
+                    "metadata": {"is_visually_hidden_from_conversation": True},
+                },
+            },
+            "user": {
+                "parent": "context",
+                "message": {
+                    "author": {"role": "user"},
+                    "content": {"content_type": "text", "parts": ["question"]},
+                },
+            },
+            "assistant": {
+                "parent": "user",
+                "message": {
+                    "author": {"role": "assistant"},
+                    "content": {"content_type": "text", "parts": ["answer"]},
+                },
+            },
+        },
+    }
+
+    output = TextFormatter().format_conversation(conversation)
+
+    assert "Turns: 2" in output

@@ -8,13 +8,17 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Dict, Optional
 
-from chatgpt_export_tool.core.conversation_access import (
+from chatgpt_export_tool.core.logging_utils import get_logger
+from chatgpt_export_tool.core.transcript.access import (
     get_conversation_title,
     get_display_conversation_id,
 )
-from chatgpt_export_tool.core.runtime_config import TextOutputConfig, TranscriptConfig
-from chatgpt_export_tool.core.thread_transcript import iter_transcript_entries
-from chatgpt_export_tool.core.utils import format_timestamp, get_logger
+from chatgpt_export_tool.core.config.runtime import TextOutputConfig, TranscriptConfig
+from chatgpt_export_tool.core.transcript.thread import (
+    TranscriptEntry,
+    iter_transcript_entries,
+)
+from chatgpt_export_tool.core.utils import format_timestamp
 
 logger = get_logger()
 CHATGPT_ARTIFACT_RE = re.compile(r"[^]*")
@@ -88,13 +92,9 @@ class TextFormatter(BaseFormatter):
             lines.extend(self._render_header(conv))
             lines.append("")
 
-        context_entries = []
-        chat_entries = []
-        for entry in iter_transcript_entries(conv, self.transcript_config):
-            if entry.content_type == "user_editable_context":
-                context_entries.append(entry)
-            else:
-                chat_entries.append(entry)
+        context_entries, chat_entries = self._split_entries(
+            iter_transcript_entries(conv, self.transcript_config)
+        )
 
         if context_entries:
             lines.extend(self._render_context_entries(context_entries))
@@ -122,7 +122,19 @@ class TextFormatter(BaseFormatter):
         except ValueError:
             return len(lines)
 
-    def _render_context_entries(self, entries: list[Any]) -> list[str]:
+    def _split_entries(
+        self, entries: Any
+    ) -> tuple[list[TranscriptEntry], list[TranscriptEntry]]:
+        context_entries: list[TranscriptEntry] = []
+        chat_entries: list[TranscriptEntry] = []
+        for entry in entries:
+            if entry.content_type == "user_editable_context":
+                context_entries.append(entry)
+            else:
+                chat_entries.append(entry)
+        return context_entries, chat_entries
+
+    def _render_context_entries(self, entries: list[TranscriptEntry]) -> list[str]:
         lines = [self._render_section_heading("Conversation Context")]
         for entry in entries:
             for line in self._prepare_text(entry.text).splitlines():
@@ -130,7 +142,7 @@ class TextFormatter(BaseFormatter):
                     lines.append(f"{self.indent}{line}")
         return lines
 
-    def _group_chat_entries(self, entries: list[Any]) -> list[TurnBlock]:
+    def _group_chat_entries(self, entries: list[TranscriptEntry]) -> list[TurnBlock]:
         blocks: list[TurnBlock] = []
         current_heading: Optional[str] = None
         current_parts: list[str] = []
@@ -172,7 +184,7 @@ class TextFormatter(BaseFormatter):
             lines.extend(body_lines)
         return lines
 
-    def _render_turn_heading(self, entry: Any, *, turn_number: int) -> str:
+    def _render_turn_heading(self, entry: TranscriptEntry, *, turn_number: int) -> str:
         role_label = self._get_role_label(entry.role, entry.content_type)
         if self.text_output_config.include_turn_numbers:
             role_label = f"Turn {turn_number} · {role_label}"

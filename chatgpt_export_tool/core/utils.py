@@ -1,11 +1,6 @@
-"""Formatting helpers plus compatibility re-exports."""
+"""Small shared formatting helpers."""
 
 from datetime import datetime
-
-from .file_utils import get_file_size as get_file_size
-from .file_utils import validate_file as validate_file
-from .logging_utils import get_logger as get_logger
-from .logging_utils import setup_logging as setup_logging
 
 
 def format_size(size_bytes: int) -> str:

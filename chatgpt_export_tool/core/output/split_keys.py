@@ -3,12 +3,12 @@
 from logging import Logger
 from typing import Any, Dict
 
-from .conversation_access import (
+from chatgpt_export_tool.core.logging_utils import get_logger
+from chatgpt_export_tool.core.transcript.access import (
     get_date_group_key,
     get_id_group_key,
     get_subject_group_key,
 )
-from .utils import get_logger
 
 
 def resolve_group_key(

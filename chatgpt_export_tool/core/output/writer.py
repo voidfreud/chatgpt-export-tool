@@ -4,11 +4,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set
 
-from chatgpt_export_tool.core.conversation_formatters import BaseFormatter
-from chatgpt_export_tool.core.file_naming import FileNamer
-from chatgpt_export_tool.core.output_paths import OutputPathResolver
+from chatgpt_export_tool.core.logging_utils import get_logger
+from chatgpt_export_tool.core.output.formatters import BaseFormatter
 from chatgpt_export_tool.core.splitter import SplitMode
-from chatgpt_export_tool.core.utils import get_logger
+from .naming import FileNamer
+from .paths import OutputPathResolver
 
 logger = get_logger()
 

@@ -1,6 +1,6 @@
 """Tests for split-key resolution helpers."""
 
-from chatgpt_export_tool.core.split_keys import resolve_group_key
+from chatgpt_export_tool.core.output.split_keys import resolve_group_key
 
 
 def test_resolve_group_key_subject_uses_title_and_id_fallbacks() -> None:

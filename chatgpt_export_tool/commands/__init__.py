@@ -32,29 +32,49 @@ class BaseCommand(ABC):
             Process exit code.
         """
         try:
-            self.logger.info("Processing file: %s", self.filepath)
-            validate_file(self.filepath)
-            self._execute()
-            return 0
+            return self._run_with_handling()
         except FileNotFoundError as exc:
-            self.logger.error("File not found: %s", exc)
-            print(f"Error: {exc}", file=sys.stderr)
-            return 1
+            return self._handle_file_not_found(exc)
         except PermissionError as exc:
-            self.logger.error("Permission denied: %s", exc)
-            print(f"Error: Permission denied - {exc}", file=sys.stderr)
-            return 1
+            return self._handle_permission_error(exc)
         except KeyboardInterrupt:
-            self.logger.info("Operation cancelled by user")
-            print("\nOperation cancelled by user.", file=sys.stderr)
-            return 130
+            return self._handle_keyboard_interrupt()
         except Exception as exc:  # pragma: no cover - defensive top-level guard
-            self.logger.error("Unexpected error: %s", exc)
-            self.logger.debug("Traceback:", exc_info=True)
-            print(f"Error: Unexpected error - {exc}", file=sys.stderr)
-            if self.logger.level <= 10:
-                traceback.print_exc()
-            return 1
+            return self._handle_unexpected_error(exc)
+
+    def _run_with_handling(self) -> int:
+        """Validate common inputs and execute the concrete command."""
+        self.logger.info("Processing file: %s", self.filepath)
+        validate_file(self.filepath)
+        self._execute()
+        return 0
+
+    def _handle_file_not_found(self, exc: FileNotFoundError) -> int:
+        """Render a consistent file-not-found error."""
+        self.logger.error("File not found: %s", exc)
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    def _handle_permission_error(self, exc: PermissionError) -> int:
+        """Render a consistent permission error."""
+        self.logger.error("Permission denied: %s", exc)
+        print(f"Error: Permission denied - {exc}", file=sys.stderr)
+        return 1
+
+    def _handle_keyboard_interrupt(self) -> int:
+        """Render cancellation consistently."""
+        self.logger.info("Operation cancelled by user")
+        print("\nOperation cancelled by user.", file=sys.stderr)
+        return 130
+
+    def _handle_unexpected_error(self, exc: Exception) -> int:
+        """Render an unexpected top-level failure."""
+        self.logger.error("Unexpected error: %s", exc)
+        self.logger.debug("Traceback:", exc_info=True)
+        print(f"Error: Unexpected error - {exc}", file=sys.stderr)
+        if self.logger.level <= 10:
+            traceback.print_exc()
+        return 1
 
     @abstractmethod
     def _execute(self) -> None:

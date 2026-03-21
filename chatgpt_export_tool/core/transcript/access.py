@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any, Dict, Iterator, Optional
 
-from .thread_transcript import (
+from .thread import (
     extract_message_text,
     get_message_content_type,
     get_message_create_time as get_message_create_time,
