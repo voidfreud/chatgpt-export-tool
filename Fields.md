@@ -218,9 +218,11 @@ chatgpt-export export data.json --split subject --output-dir exports --fields "g
 
 - `analyze --fields` reports field coverage; it does not accept the export-style field-selection spec.
 - `export` can load defaults from a TOML file via `--config PATH`.
+- The repo ships `chatgpt_export.toml.example` as a template; copy it to a local file before use.
 - `export --split single` writes to stdout unless `--output` is provided.
 - Subject split files are named from the source conversation title plus identifier.
 - Split modes such as `subject`, `date`, and `id` write to `--output-dir`.
 - Text export follows the active conversation branch and is configurable through the `[transcript]` and `[text_output]` TOML sections.
 - Default text export shows user text, assistant text, assistant thoughts, and a compact preview of `user_editable_context`.
 - Default text export hides assistant code, reasoning recap, and tool plumbing unless the transcript policy explicitly enables them.
+- Advanced transcript controls include `user_editable_context_mode`, `show_visually_hidden_content_types`, `include_content_types`, and `exclude_content_types`.

@@ -2,7 +2,9 @@
 
 from .config_models import DefaultsConfig, TranscriptConfig
 from .field_validation import FieldValidator
+from .metadata_validation import validate_metadata_patterns
 from .splitter import SplitMode
+from .validation_models import ValidationResult
 
 
 def validate_defaults_config(defaults: DefaultsConfig) -> None:
@@ -25,6 +27,18 @@ def validate_defaults_config(defaults: DefaultsConfig) -> None:
         raise ValueError(
             "Config value 'fields' is invalid: " + "; ".join(validation.errors)
         )
+
+
+def validate_metadata_defaults(defaults: DefaultsConfig) -> ValidationResult:
+    """Validate metadata include/exclude defaults from TOML config."""
+    result = ValidationResult()
+
+    if defaults.include_metadata:
+        result.merge(validate_metadata_patterns(list(defaults.include_metadata)))
+    if defaults.exclude_metadata:
+        result.merge(validate_metadata_patterns(list(defaults.exclude_metadata)))
+
+    return result
 
 
 def validate_transcript_config(transcript: TranscriptConfig) -> None:

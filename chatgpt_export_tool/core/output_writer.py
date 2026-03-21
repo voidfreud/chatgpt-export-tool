@@ -167,11 +167,12 @@ class OutputWriter:
             formatter: Formatter to render the conversation.
 
         Returns:
-            Number of characters written.
+            Number of UTF-8 bytes written.
         """
         content = formatter.format_conversation(conv)
         with open(filepath, "w", encoding="utf-8") as handle:
-            return handle.write(content)
+            handle.write(content)
+        return len(content.encode("utf-8"))
 
 
 __all__ = ["FileNamer", "OutputWriter", "WriteJob", "WriteResult"]

@@ -37,6 +37,7 @@ Examples:
   chatgpt-export export data.json --output conversations.txt
   chatgpt-export export data.json --format json --output conversations.json
   chatgpt-export export data.json --fields "groups minimal"
+  cp chatgpt_export.toml.example chatgpt_export.toml
   chatgpt-export export data.json --config chatgpt_export.toml
   chatgpt-export export data.json --fields "include title,mapping" --include "model*" --exclude plugin_ids
 

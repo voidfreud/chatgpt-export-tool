@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from chatgpt_export_tool.core.logging_utils import setup_logging
 from chatgpt_export_tool.core.runtime_config import (
     DEFAULT_CONFIG_FILENAME,
     load_runtime_config,
@@ -104,3 +105,123 @@ user_editable_context_mode = "summary"
 
     with pytest.raises(ValueError):
         load_runtime_config(str(config_path))
+
+
+def test_load_runtime_config_rejects_invalid_section_shape(tmp_path: Path) -> None:
+    """Config sections must be TOML tables when present."""
+    config_path = tmp_path / "broken.toml"
+    config_path.write_text(
+        """
+defaults = "not-a-table"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError):
+        load_runtime_config(str(config_path))
+
+
+def test_load_runtime_config_rejects_missing_explicit_path() -> None:
+    """An explicit config path should fail fast when the file is missing."""
+    with pytest.raises(ValueError):
+        load_runtime_config("/definitely/missing/chatgpt_export.toml")
+
+
+def test_load_runtime_config_rejects_invalid_numeric_and_list_values(
+    tmp_path: Path,
+) -> None:
+    """Integer and string-list config fields should validate strictly."""
+    config_path = tmp_path / "broken.toml"
+    config_path.write_text(
+        """
+[transcript]
+user_editable_context_preview_chars = -1
+show_visually_hidden_content_types = "user_editable_context"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError):
+        load_runtime_config(str(config_path))
+
+
+def test_load_runtime_config_rejects_invalid_string_value_type(tmp_path: Path) -> None:
+    """String-valued config keys should reject non-string TOML values."""
+    config_path = tmp_path / "broken.toml"
+    config_path.write_text(
+        """
+[defaults]
+format = 123
+""".strip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError):
+        load_runtime_config(str(config_path))
+
+
+def test_load_runtime_config_rejects_invalid_integer_value_type(tmp_path: Path) -> None:
+    """Integer-valued config keys should reject non-integer TOML values."""
+    config_path = tmp_path / "broken.toml"
+    config_path.write_text(
+        """
+[transcript]
+user_editable_context_preview_chars = "wide"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError):
+        load_runtime_config(str(config_path))
+
+
+def test_load_runtime_config_rejects_invalid_string_list_items(tmp_path: Path) -> None:
+    """String-list config keys should reject mixed-type arrays."""
+    config_path = tmp_path / "broken.toml"
+    config_path.write_text(
+        """
+[text_output]
+header_fields = ["title", 1]
+""".strip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError):
+        load_runtime_config(str(config_path))
+
+
+def test_load_runtime_config_rejects_invalid_metadata_defaults(tmp_path: Path) -> None:
+    """Metadata defaults should validate during config loading."""
+    config_path = tmp_path / "broken.toml"
+    config_path.write_text(
+        """
+[defaults]
+include_metadata = [""]
+""".strip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError):
+        load_runtime_config(str(config_path))
+
+
+def test_load_runtime_config_warns_for_unknown_metadata_defaults(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Unknown metadata defaults should warn at config-load time."""
+    setup_logging(verbose=True)
+    config_path = tmp_path / "warn.toml"
+    config_path.write_text(
+        """
+[defaults]
+include_metadata = ["unknown_metadata"]
+""".strip(),
+        encoding="utf-8",
+    )
+
+    config = load_runtime_config(str(config_path))
+
+    captured = capsys.readouterr()
+    assert config.defaults.include_metadata == ("unknown_metadata",)
+    assert "matches no known metadata fields" in captured.err

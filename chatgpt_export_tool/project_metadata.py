@@ -1,24 +1,14 @@
 """Project metadata helpers."""
 
-from pathlib import Path
+from importlib.metadata import PackageNotFoundError, version
 
-try:  # pragma: no cover - Python 3.11+
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
-    import tomli as tomllib
+PACKAGE_NAME = "chatgpt-export-tool"
+UNKNOWN_VERSION = "0+unknown"
 
 
 def read_project_version() -> str:
-    """Read the package version from ``pyproject.toml``."""
-    pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
-    with open(pyproject, "rb") as handle:
-        payload = tomllib.load(handle)
-
-    project = payload.get("project")
-    if not isinstance(project, dict):
-        raise RuntimeError("Unable to determine package version from pyproject.toml")
-
-    version = project.get("version")
-    if not isinstance(version, str):
-        raise RuntimeError("Unable to determine package version from pyproject.toml")
-    return version
+    """Read the installed package version when available."""
+    try:
+        return version(PACKAGE_NAME)
+    except PackageNotFoundError:
+        return UNKNOWN_VERSION

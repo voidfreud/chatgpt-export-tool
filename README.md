@@ -13,7 +13,7 @@ The project focuses on two things:
 
 It uses streaming JSON parsing with `ijson` and is organized around small core modules so filtering, formatting, split behavior, and path generation can be changed independently.
 
-Persistent defaults can be stored in a single TOML config file such as `chatgpt_export.toml`.
+Persistent defaults can be stored in a single TOML config file. The repo ships a template at `chatgpt_export.toml.example`.
 
 ## Installation
 
@@ -37,7 +37,7 @@ You can then run the CLI with:
 uv run chatgpt-export --help
 ```
 
-To apply config defaults, pass `--config PATH`.
+To apply config defaults, copy the template and pass `--config PATH`.
 
 ## Quick Start
 
@@ -114,6 +114,7 @@ uv run chatgpt-export export data.json --format json --output conversations.json
 uv run chatgpt-export export data.json --split subject --output-dir exports
 uv run chatgpt-export export data.json --fields "groups minimal" --split subject --output-dir exports
 uv run chatgpt-export export data.json --fields "include title,mapping" --include "model*" --exclude plugin_ids
+cp chatgpt_export.toml.example chatgpt_export.toml
 uv run chatgpt-export export data.json --config chatgpt_export.toml
 ```
 
@@ -194,9 +195,18 @@ Supported formats:
 
 By default, text export includes user text, assistant text, assistant thoughts, and user editable context when present. User editable context is rendered in a compact preview by default so transcripts stay readable. Text export hides tool plumbing, assistant code, reasoning recap, and blank/internal nodes unless the transcript policy is changed in config.
 
+Important transcript policy options include:
+
+- `user_editable_context_mode`
+- `show_visually_hidden_content_types`
+- `include_content_types`
+- `exclude_content_types`
+
 ## Configuration
 
 `export` accepts `--config PATH` and resolves defaults from one TOML file.
+
+The repo ships `chatgpt_export.toml.example` as a template. Copy it to a local file such as `chatgpt_export.toml` and pass that path explicitly.
 
 The config file is TOML and is intentionally kept to one file with sections such as:
 

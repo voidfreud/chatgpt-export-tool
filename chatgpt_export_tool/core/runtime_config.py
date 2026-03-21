@@ -15,7 +15,14 @@ from .config_models import (
     TextOutputConfig,
     TranscriptConfig,
 )
-from .config_validation import validate_defaults_config, validate_transcript_config
+from .config_validation import (
+    validate_defaults_config,
+    validate_metadata_defaults,
+    validate_transcript_config,
+)
+from .logging_utils import get_logger
+
+logger = get_logger()
 
 
 def load_runtime_config(config_path: Optional[str] = None) -> RuntimeConfig:
@@ -63,6 +70,14 @@ def _load_defaults(section: Any) -> DefaultsConfig:
         ),
     )
     validate_defaults_config(defaults)
+    metadata_validation = validate_metadata_defaults(defaults)
+    if not metadata_validation.is_valid:
+        raise ValueError(
+            "Config metadata defaults are invalid: "
+            + "; ".join(metadata_validation.errors)
+        )
+    for warning in metadata_validation.warnings:
+        logger.warning(warning)
     return defaults
 
 

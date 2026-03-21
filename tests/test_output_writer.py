@@ -219,6 +219,34 @@ class TestOutputWriter:
         assert result.total_bytes > 0
         assert len(result.errors) == 0
 
+    def test_write_jobs_reports_real_utf8_bytes(self, tmp_path):
+        """total_bytes should track encoded byte count, not character count."""
+        writer = OutputWriter(output_dir=str(tmp_path), format_type="txt")
+        jobs = [
+            WriteJob(
+                source_conversation={"title": "Emoji", "id": "1"},
+                rendered_conversation={
+                    "title": "Emoji",
+                    "id": "1",
+                    "mapping": {
+                        "node": {
+                            "message": {
+                                "author": {"role": "assistant"},
+                                "content": {"parts": ["hello €"]},
+                            }
+                        }
+                    },
+                },
+                group_key="all",
+            )
+        ]
+
+        result = writer.write_jobs(jobs, TextFormatter())
+
+        written_file = next(tmp_path.iterdir())
+        expected_bytes = written_file.read_bytes()
+        assert result.total_bytes == len(expected_bytes)
+
     def test_write_conversations_date_mode(self, tmp_path):
         """Test write_jobs with DATE mode creates subdirs."""
         writer = OutputWriter(

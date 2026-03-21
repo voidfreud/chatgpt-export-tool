@@ -246,3 +246,209 @@ def test_extract_message_text_uses_full_context_mode_when_requested() -> None:
 
     assert "..." not in text
     assert "profile profile" in text
+
+
+def test_transcript_helpers_cover_non_dict_and_fallback_content_shapes() -> None:
+    """Transcript helpers should stay resilient to odd export payloads."""
+    conversation = {
+        "mapping": {
+            "bad-node": "skip-me",
+            "user": {
+                "message": {
+                    "author": "plain-user",
+                    "content": "raw text payload",
+                    "create_time": "bad-time",
+                }
+            },
+            "assistant": {
+                "message": {
+                    "author": {},
+                    "content": {"content_type": "text", "parts": "scalar-parts"},
+                }
+            },
+        }
+    }
+
+    entries = list(
+        iter_transcript_entries(
+            conversation,
+            TranscriptConfig(
+                follow_current_branch=False,
+                include_content_types=("str", "text"),
+            ),
+        )
+    )
+
+    assert [
+        (entry.role, entry.content_type, entry.text, entry.timestamp)
+        for entry in entries
+    ] == [
+        ("unknown", "str", "raw text payload", None),
+        ("unknown", "text", "scalar-parts", None),
+    ]
+
+
+def test_transcript_policy_handles_unknown_roles_and_hidden_overrides() -> None:
+    """Unknown roles should stay hidden unless explicitly forced by content type."""
+    conversation = {
+        "current_node": "weird",
+        "mapping": {
+            "weird": {
+                "parent": None,
+                "message": {
+                    "author": {"role": "critic"},
+                    "content": {
+                        "content_type": "multimodal_text",
+                        "parts": ["visible"],
+                    },
+                    "metadata": {"is_visually_hidden_from_conversation": True},
+                },
+            }
+        },
+    }
+
+    hidden_entries = list(iter_transcript_entries(conversation, TranscriptConfig()))
+    forced_entries = list(
+        iter_transcript_entries(
+            conversation,
+            TranscriptConfig(
+                include_content_types=("multimodal_text",),
+                show_visually_hidden_content_types=("multimodal_text",),
+            ),
+        )
+    )
+
+    assert hidden_entries == []
+    assert [
+        (entry.role, entry.content_type, entry.text) for entry in forced_entries
+    ] == [("critic", "multimodal_text", "visible")]
+
+
+def test_transcript_policy_covers_remaining_role_and_content_type_branches() -> None:
+    """System/tool/user/assistant content-type toggles should all behave explicitly."""
+    conversation = {
+        "current_node": "assistant-mm",
+        "mapping": {
+            "system": {
+                "parent": None,
+                "message": {
+                    "author": {"role": "system"},
+                    "content": {"content_type": "text", "parts": ["system"]},
+                },
+            },
+            "tool": {
+                "parent": "system",
+                "message": {
+                    "author": {"role": "tool"},
+                    "content": {"content_type": "text", "parts": ["tool"]},
+                },
+            },
+            "user-mm": {
+                "parent": "tool",
+                "message": {
+                    "author": {"role": "user"},
+                    "content": {
+                        "content_type": "multimodal_text",
+                        "parts": ["user-mm"],
+                    },
+                },
+            },
+            "assistant-recap": {
+                "parent": "user-mm",
+                "message": {
+                    "author": {"role": "assistant"},
+                    "content": {
+                        "content_type": "reasoning_recap",
+                        "parts": ["recap"],
+                    },
+                },
+            },
+            "assistant-mm": {
+                "parent": "assistant-recap",
+                "message": {
+                    "author": {"role": "assistant"},
+                    "content": {
+                        "content_type": "multimodal_text",
+                        "parts": ["assistant-mm"],
+                    },
+                },
+            },
+        },
+    }
+
+    entries = list(
+        iter_transcript_entries(
+            conversation,
+            TranscriptConfig(
+                show_system_messages=True,
+                show_tool_messages=True,
+                show_reasoning_recap=True,
+            ),
+        )
+    )
+
+    assert [(entry.role, entry.content_type, entry.text) for entry in entries] == [
+        ("system", "text", "system"),
+        ("tool", "text", "tool"),
+        ("user", "multimodal_text", "user-mm"),
+        ("assistant", "reasoning_recap", "recap"),
+        ("assistant", "multimodal_text", "assistant-mm"),
+    ]
+
+
+def test_transcript_branch_and_text_helpers_cover_fallback_edges() -> None:
+    """Branch traversal and text extraction should cover remaining fallback edges."""
+    cyclic_conversation = {
+        "current_node": "a",
+        "mapping": {
+            "a": {"parent": "b", "message": None},
+            "b": {
+                "parent": "a",
+                "message": {"author": {"role": "user"}, "content": {}},
+            },
+            "c": "skip",
+        },
+    }
+
+    branch_messages = list(
+        iter_branch_messages(cyclic_conversation, follow_current=True)
+    )
+    assert len(branch_messages) == 1
+
+    assert (
+        extract_message_text(
+            {
+                "content": {
+                    "content_type": "text",
+                    "parts": ["   ", ""],
+                    "text": "fallback text",
+                }
+            }
+        )
+        == "fallback text"
+    )
+    assert (
+        extract_message_text({"content": {"content_type": "text", "parts": []}}) == ""
+    )
+    assert (
+        extract_message_text(
+            {
+                "content": {
+                    "content_type": "user_editable_context",
+                    "user_instructions": "instructions only",
+                }
+            }
+        )
+        == "User instructions: instructions only"
+    )
+    assert (
+        extract_message_text(
+            {
+                "content": {
+                    "content_type": "user_editable_context",
+                    "user_profile": "profile only",
+                }
+            }
+        )
+        == "User profile: profile only"
+    )
