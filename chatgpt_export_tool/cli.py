@@ -37,7 +37,7 @@ Examples:
   chatgpt-export export data.json --output conversations.txt
   chatgpt-export export data.json --format json --output conversations.json
   chatgpt-export export data.json --fields "groups minimal"
-  chatgpt-export export data.json --fields "include title,mapping" --include model* --exclude plugin_ids
+  chatgpt-export export data.json --fields "include title,mapping" --include "model*" --exclude plugin_ids
 
 See 'chatgpt-export analyze -h' or 'chatgpt-export export -h' for full details.
         """,

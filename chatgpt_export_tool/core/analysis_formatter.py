@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-from chatgpt_export_tool.core.field_selector import FieldSelector
+from chatgpt_export_tool.core.field_rules import categorize_fields
 from chatgpt_export_tool.core.utils import format_timestamp, get_logger
 
 logger = get_logger()
@@ -72,7 +72,7 @@ def format_analysis_text(
         lines.append(f"Total unique fields: {len(sorted_fields)}")
         lines.append("")
 
-        categorized = FieldSelector.categorize_fields(results["all_fields"])
+        categorized = categorize_fields(results["all_fields"])
         logger.debug("Field categorization: %s", list(categorized))
 
         for category, fields in categorized.items():

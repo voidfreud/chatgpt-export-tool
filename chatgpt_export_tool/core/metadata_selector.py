@@ -1,4 +1,4 @@
-"""Metadata filtering for conversations."""
+"""Metadata filtering for nested message metadata."""
 
 from typing import Any, Dict, List, Optional, Set
 
@@ -44,7 +44,7 @@ class MetadataSelector:
         )
 
     def filter_metadata(self, conv: Dict[str, Any]) -> Dict[str, Any]:
-        """Filter top-level and nested message metadata in place.
+        """Filter nested message metadata in place.
 
         Args:
             conv: Conversation dictionary.
@@ -57,10 +57,6 @@ class MetadataSelector:
             self.exclude_fields,
             set(METADATA_FIELDS.keys()),
         )
-
-        for key in list(conv.keys()):
-            if key in METADATA_FIELDS and key not in fields_to_keep:
-                del conv[key]
 
         mapping = conv.get("mapping")
         if isinstance(mapping, dict):

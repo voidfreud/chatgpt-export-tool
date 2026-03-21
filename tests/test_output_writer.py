@@ -8,7 +8,12 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from chatgpt_export_tool.core.conversation_formatters import TextFormatter
-from chatgpt_export_tool.core.output_writer import FileNamer, OutputWriter, WriteResult
+from chatgpt_export_tool.core.output_writer import (
+    FileNamer,
+    OutputWriter,
+    WriteJob,
+    WriteResult,
+)
 from chatgpt_export_tool.core.output_paths import OutputPathResolver
 from chatgpt_export_tool.core.splitter import SplitMode
 
@@ -191,38 +196,52 @@ class TestOutputWriter:
         assert path == Path("/output/Test_123.txt")
 
     def test_write_conversations_single_group(self, tmp_path):
-        """Test write_conversations with single group."""
+        """Test write_jobs with two conversations."""
         writer = OutputWriter(output_dir=str(tmp_path), format_type="txt")
 
-        groups = {
-            "all": [
-                {"title": "Conv 1", "id": "1"},
-                {"title": "Conv 2", "id": "2"},
-            ]
-        }
+        jobs = [
+            WriteJob(
+                source_conversation={"title": "Conv 1", "id": "1"},
+                rendered_conversation={"title": "Conv 1", "id": "1"},
+                group_key="all",
+            ),
+            WriteJob(
+                source_conversation={"title": "Conv 2", "id": "2"},
+                rendered_conversation={"title": "Conv 2", "id": "2"},
+                group_key="all",
+            ),
+        ]
 
         formatter = TextFormatter()
-        result = writer.write_conversations(groups, formatter)
+        result = writer.write_jobs(jobs, formatter)
 
         assert result.files_written == 2
         assert result.total_bytes > 0
         assert len(result.errors) == 0
 
     def test_write_conversations_date_mode(self, tmp_path):
-        """Test write_conversations with DATE mode creates subdirs."""
+        """Test write_jobs with DATE mode creates subdirs."""
         writer = OutputWriter(
             output_dir=str(tmp_path),
             format_type="txt",
             split_mode=SplitMode.DATE,
         )
 
-        groups = {
-            "2024-03-01": [{"title": "Conv 1", "id": "1"}],
-            "2024-03-02": [{"title": "Conv 2", "id": "2"}],
-        }
+        jobs = [
+            WriteJob(
+                source_conversation={"title": "Conv 1", "id": "1"},
+                rendered_conversation={"title": "Conv 1", "id": "1"},
+                group_key="2024-03-01",
+            ),
+            WriteJob(
+                source_conversation={"title": "Conv 2", "id": "2"},
+                rendered_conversation={"title": "Conv 2", "id": "2"},
+                group_key="2024-03-02",
+            ),
+        ]
 
         formatter = TextFormatter()
-        result = writer.write_conversations(groups, formatter)
+        result = writer.write_jobs(jobs, formatter)
 
         assert result.files_written == 2
         assert result.directories_created == 2
@@ -230,15 +249,21 @@ class TestOutputWriter:
         assert (tmp_path / "2024-03-02").exists()
 
     def test_write_conversations_creates_output_dir(self, tmp_path):
-        """Test write_conversations creates output directory if missing."""
+        """Test write_jobs creates output directory if missing."""
         writer = OutputWriter(
             output_dir=str(tmp_path / "nonexistent"), format_type="txt"
         )
 
-        groups = {"all": [{"title": "Conv 1", "id": "1"}]}
+        jobs = [
+            WriteJob(
+                source_conversation={"title": "Conv 1", "id": "1"},
+                rendered_conversation={"title": "Conv 1", "id": "1"},
+                group_key="all",
+            )
+        ]
 
         formatter = TextFormatter()
-        result = writer.write_conversations(groups, formatter)
+        result = writer.write_jobs(jobs, formatter)
 
         # Directory should be created and write should succeed
         assert (tmp_path / "nonexistent").exists()
@@ -250,26 +275,33 @@ class TestOutputWriterEdgeCases:
     """Edge case tests for OutputWriter."""
 
     def test_write_empty_groups(self, tmp_path):
-        """Test write_conversations with empty groups."""
+        """Test write_jobs with an empty job list."""
         writer = OutputWriter(output_dir=str(tmp_path), format_type="txt")
 
-        groups = {}
         formatter = TextFormatter()
-        result = writer.write_conversations(groups, formatter)
+        result = writer.write_jobs([], formatter)
 
         assert result.files_written == 0
 
     def test_write_conversations_multiple_groups(self, tmp_path):
-        """Test write_conversations handles multiple groups correctly."""
+        """Test write_jobs handles multiple groups correctly."""
         writer = OutputWriter(output_dir=str(tmp_path / "output"), format_type="txt")
 
-        groups = {
-            "group1": [{"title": "Conv 1", "id": "1"}],
-            "group2": [{"title": "Conv 2", "id": "2"}],
-        }
+        jobs = [
+            WriteJob(
+                source_conversation={"title": "Conv 1", "id": "1"},
+                rendered_conversation={"title": "Conv 1", "id": "1"},
+                group_key="group1",
+            ),
+            WriteJob(
+                source_conversation={"title": "Conv 2", "id": "2"},
+                rendered_conversation={"title": "Conv 2", "id": "2"},
+                group_key="group2",
+            ),
+        ]
 
         formatter = TextFormatter()
-        result = writer.write_conversations(groups, formatter)
+        result = writer.write_jobs(jobs, formatter)
 
         # Both groups should succeed
         assert result.files_written == 2

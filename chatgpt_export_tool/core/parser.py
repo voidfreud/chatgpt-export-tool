@@ -5,7 +5,9 @@ from typing import Any, Dict
 import ijson
 
 from chatgpt_export_tool.core.analysis_collector import AnalysisCollector
-from chatgpt_export_tool.core.utils import format_size, get_file_size, get_logger
+from chatgpt_export_tool.core.file_utils import get_file_size
+from chatgpt_export_tool.core.logging_utils import get_logger
+from chatgpt_export_tool.core.utils import format_size
 
 # Module-level logger for consistent naming across the codebase
 logger = get_logger()

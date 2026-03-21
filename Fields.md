@@ -148,13 +148,13 @@ Use:
 - `--include PATTERN [PATTERN ...]`
 - `--exclude PATTERN [PATTERN ...]`
 
-These apply to known metadata names after structural field filtering.
+These apply to known metadata names inside nested `message.metadata` dictionaries after structural field filtering.
 
 Examples:
 
 ```bash
 chatgpt-export export data.json --include model_slug
-chatgpt-export export data.json --include model* --exclude plugin_ids
+chatgpt-export export data.json --include "model*" --exclude plugin_ids
 chatgpt-export export data.json --fields "groups message" --include is_archived
 ```
 
@@ -168,17 +168,9 @@ Pattern matching supports:
 
 The current metadata filter recognizes these names:
 
-- `id`
-- `title`
-- `create_time`
-- `update_time`
 - `model_slug`
 - `message_type`
 - `plugin_ids`
-- `conversation_id`
-- `type`
-- `moderation_results`
-- `current_node`
 - `is_archived`
 
 ## How Filtering Combines
@@ -211,7 +203,7 @@ chatgpt-export export data.json --fields "exclude plugin_ids,moderation_results"
 Keep only message-oriented structure and model metadata:
 
 ```bash
-chatgpt-export export data.json --fields "groups message" --include model*
+chatgpt-export export data.json --fields "groups message" --include "model*"
 ```
 
 Write one file per conversation with a minimal payload:

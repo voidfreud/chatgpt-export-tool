@@ -1,6 +1,7 @@
 """Export command for chatgpt_export_tool."""
 
 import argparse
+import sys
 from typing import Optional
 
 from chatgpt_export_tool.commands import BaseCommand
@@ -40,6 +41,11 @@ class ExportCommand(BaseCommand):
             debug: Whether DEBUG logging is enabled.
         """
         super().__init__(filepath=filepath, verbose=verbose, debug=debug)
+        self._validate_output_targets(
+            split_mode=split_mode,
+            output_file=output_file,
+            output_dir=output_dir,
+        )
         self.config = ExportConfig(
             filepath=filepath,
             format_type=format_type,
@@ -51,6 +57,20 @@ class ExportCommand(BaseCommand):
             exclude_metadata=exclude,
             verbose=self.logger.level <= 20,
         )
+
+    @staticmethod
+    def _validate_output_targets(
+        split_mode: str,
+        output_file: Optional[str],
+        output_dir: Optional[str],
+    ) -> None:
+        """Validate output-target arguments for the selected split mode."""
+        if split_mode == "single" and output_dir:
+            raise ValueError(
+                "--output-dir can only be used with split modes subject, date, or id"
+            )
+        if split_mode != "single" and output_file:
+            raise ValueError("--output can only be used with --split single")
 
     def _execute(self) -> None:
         """Run the export command."""
@@ -86,18 +106,22 @@ def export_command(args: argparse.Namespace) -> int:
     Returns:
         Process exit code.
     """
-    command = ExportCommand(
-        filepath=args.file,
-        format_type=args.format,
-        output_file=getattr(args, "output", None),
-        output_dir=getattr(args, "output_dir", None),
-        split_mode=getattr(args, "split", "single"),
-        fields=args.fields,
-        include=getattr(args, "include", None),
-        exclude=getattr(args, "exclude", None),
-        verbose=args.verbose,
-        debug=args.debug,
-    )
+    try:
+        command = ExportCommand(
+            filepath=args.file,
+            format_type=args.format,
+            output_file=getattr(args, "output", None),
+            output_dir=getattr(args, "output_dir", None),
+            split_mode=getattr(args, "split", "single"),
+            fields=args.fields,
+            include=getattr(args, "include", None),
+            exclude=getattr(args, "exclude", None),
+            verbose=args.verbose,
+            debug=args.debug,
+        )
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
     return command.run()
 
 
@@ -145,7 +169,7 @@ Examples:
   chatgpt-export export data.json --format json --output conversations.json
   chatgpt-export export data.json --split subject --output-dir ./exports
   chatgpt-export export data.json --fields "groups minimal" --split subject
-  chatgpt-export export data.json --fields "include title,mapping" --include model* --exclude plugin_ids
+  chatgpt-export export data.json --fields "include title,mapping" --include "model*" --exclude plugin_ids
         """,
     )
 

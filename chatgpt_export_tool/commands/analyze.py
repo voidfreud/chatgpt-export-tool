@@ -2,6 +2,7 @@
 
 import argparse
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from chatgpt_export_tool.commands import BaseCommand
@@ -10,8 +11,9 @@ from chatgpt_export_tool.core.analysis_formatter import (
     AnalyzeConfig,
     format_analysis_text,
 )
+from chatgpt_export_tool.core.file_utils import get_file_size
 from chatgpt_export_tool.core.parser import JSONParser
-from chatgpt_export_tool.core.utils import format_size, get_file_size
+from chatgpt_export_tool.core.utils import format_size
 
 
 class AnalyzeCommand(BaseCommand):
@@ -60,9 +62,11 @@ class AnalyzeCommand(BaseCommand):
         )
 
         if self.output_file:
-            with open(self.output_file, "w", encoding="utf-8") as handle:
+            output_path = Path(self.output_file)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_path, "w", encoding="utf-8") as handle:
                 handle.write(output)
-            print(f"Output written to: {self.output_file}")
+            print(f"Output written to: {output_path}")
             return
 
         print(output)

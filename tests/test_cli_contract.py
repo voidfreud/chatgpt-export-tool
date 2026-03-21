@@ -32,7 +32,8 @@ def test_fields_reference_uses_current_command_name() -> None:
     assert 'chatgpt-export export data.json --fields "groups minimal"' in text
     assert "chatgpt-export export data.json --include model_slug" in text
     assert (
-        "chatgpt-export export data.json --include model* --exclude plugin_ids" in text
+        'chatgpt-export export data.json --include "model*" --exclude plugin_ids'
+        in text
     )
     assert "analyze --fields" in text
     assert "chatgpt export" not in text

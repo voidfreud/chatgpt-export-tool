@@ -108,7 +108,7 @@ uv run chatgpt-export export data.json --output conversations.txt
 uv run chatgpt-export export data.json --format json --output conversations.json
 uv run chatgpt-export export data.json --split subject --output-dir exports
 uv run chatgpt-export export data.json --fields "groups minimal" --split subject --output-dir exports
-uv run chatgpt-export export data.json --fields "include title,mapping" --include model* --exclude plugin_ids
+uv run chatgpt-export export data.json --fields "include title,mapping" --include "model*" --exclude plugin_ids
 ```
 
 ## Field Filtering
@@ -144,29 +144,21 @@ See [Fields.md](Fields.md) for the current field-selection reference.
 
 ## Metadata Filtering
 
-The metadata filter runs after structural field filtering and applies to metadata names known by the tool.
+The metadata filter runs after structural field filtering and applies only to keys inside nested `message.metadata` dictionaries.
 
 Examples:
 
 ```bash
 uv run chatgpt-export export data.json --include model_slug
-uv run chatgpt-export export data.json --include model* --exclude plugin_ids
+uv run chatgpt-export export data.json --include "model*" --exclude plugin_ids
 uv run chatgpt-export export data.json --fields "groups message" --include is_archived
 ```
 
 Currently supported metadata names include:
 
-- `id`
-- `title`
-- `create_time`
-- `update_time`
 - `model_slug`
 - `message_type`
 - `plugin_ids`
-- `conversation_id`
-- `type`
-- `moderation_results`
-- `current_node`
 - `is_archived`
 
 ## Split Modes
@@ -191,22 +183,19 @@ Supported formats:
 - `txt`
 - `json`
 
-`txt` is a readable conversation-oriented export.  
+`txt` is a readable conversation-oriented export.
 `json` writes the filtered conversation objects directly.
 
 ## Architecture
 
-The current structure is intentionally modular:
+The structure is intentionally modular at the subsystem level:
 
-- CLI wiring lives in `chatgpt_export_tool/commands/`
-- streaming and analysis live in `parser.py` and `analysis_collector.py`
-- field parsing and structural filtering live in `field_spec.py`, `field_rules.py`, `conversation_filter.py`, and `filter_pipeline.py`
-- metadata filtering lives in `metadata_selector.py`, `metadata_rules.py`, and `metadata_validation.py`
-- export orchestration lives in `export_service.py`
-- formatting lives in `analysis_formatter.py` and `conversation_formatters.py`
-- split-key and output-path policies live in `split_keys.py`, `file_naming.py`, `output_paths.py`, and `output_writer.py`
+- command wiring and user-facing behavior live in `chatgpt_export_tool/commands/`
+- streaming parse and analysis are separate from export formatting and writing
+- structural field filtering and metadata filtering are separate concerns
+- split-key resolution, filename policy, and writing are isolated from export orchestration
 
-That separation is deliberate: most behavior changes can now be made in a small, specific module instead of inside one large control file.
+That separation is deliberate: most behavior changes can be made in one small subsystem instead of in one large control file.
 
 ## Development
 

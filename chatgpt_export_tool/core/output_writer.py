@@ -114,31 +114,6 @@ class OutputWriter:
 
         return result
 
-    def write_conversations(
-        self,
-        groups: Dict[str, List[Dict[str, Any]]],
-        formatter: BaseFormatter,
-    ) -> WriteResult:
-        """Write grouped conversations to disk.
-
-        Args:
-            groups: Grouped conversations.
-            formatter: Formatter to render each conversation.
-
-        Returns:
-            Aggregate write result.
-        """
-        jobs = (
-            WriteJob(
-                source_conversation=conversation,
-                rendered_conversation=conversation,
-                group_key=group_key,
-            )
-            for group_key, conversations in groups.items()
-            for conversation in conversations
-        )
-        return self.write_jobs(jobs, formatter)
-
     def _get_unique_filepath(
         self,
         conv: Dict[str, Any],

@@ -212,7 +212,7 @@ class TestModuleFunctions:
 
     def test_validate_metadata_pattern_known(self):
         """Test validating known metadata pattern."""
-        result = validate_metadata_pattern("title")
+        result = validate_metadata_pattern("model_slug")
         assert result.is_valid is True
 
     def test_validate_metadata_pattern_wildcard(self):

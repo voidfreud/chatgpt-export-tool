@@ -1,9 +1,10 @@
 """Export orchestration for conversations."""
 
+import io
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import IO, Iterable, List, Optional
 
 from chatgpt_export_tool.core.conversation_formatters import (
     BaseFormatter,
@@ -16,7 +17,7 @@ from chatgpt_export_tool.core.output_writer import OutputWriter, WriteJob, Write
 from chatgpt_export_tool.core.parser import JSONParser
 from chatgpt_export_tool.core.split_keys import resolve_group_key
 from chatgpt_export_tool.core.splitter import SplitMode
-from chatgpt_export_tool.core.utils import get_logger
+from chatgpt_export_tool.core.logging_utils import get_logger
 
 logger = get_logger()
 
@@ -122,13 +123,14 @@ class ExportService:
         if self.config.output_file:
             output_path = Path(self.config.output_file)
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            self._write_single_output(output_path, formatter, pipeline)
+            with open(output_path, "w", encoding="utf-8") as handle:
+                self._write_single_stream(handle, formatter, pipeline)
             logger.info("Wrote single export file to %s", output_path)
             return ExportResult(output_file=str(output_path))
 
-        return ExportResult(
-            stdout_output=self._build_single_stdout_output(formatter, pipeline)
-        )
+        buffer = io.StringIO()
+        self._write_single_stream(buffer, formatter, pipeline)
+        return ExportResult(stdout_output=buffer.getvalue())
 
     def _export_split(
         self,
@@ -172,63 +174,44 @@ class ExportService:
             write_result=write_result,
         )
 
-    def _build_single_stdout_output(
+    def _iter_filtered_conversations(
         self,
-        formatter: BaseFormatter,
         pipeline: FilterPipeline,
-    ) -> str:
-        """Build stdout output for single-export mode."""
-        if isinstance(formatter, JSONFormatter):
-            conversations = [
-                pipeline.filter(conversation)
-                for conversation in self.parser.iterate_conversations(
-                    verbose=self.config.verbose
-                )
-            ]
-            return json.dumps(
-                conversations,
-                indent=formatter.indent,
-                sort_keys=formatter.sort_keys,
-                default=_json_default,
-            )
+    ) -> Iterable[dict]:
+        """Yield filtered conversations for export."""
+        for conversation in self.parser.iterate_conversations(
+            verbose=self.config.verbose
+        ):
+            yield pipeline.filter(conversation)
 
-        return "\n".join(
-            formatter.format_conversation(pipeline.filter(conversation))
-            for conversation in self.parser.iterate_conversations(
-                verbose=self.config.verbose
-            )
-        )
-
-    def _write_single_output(
+    def _write_single_stream(
         self,
-        output_path: Path,
+        handle: IO[str],
         formatter: BaseFormatter,
         pipeline: FilterPipeline,
     ) -> None:
         """Write single-output export content incrementally."""
-        with open(output_path, "w", encoding="utf-8") as handle:
-            if isinstance(formatter, JSONFormatter):
-                handle.write("[")
-                first = True
-                for conversation in self.parser.iterate_conversations(
-                    verbose=self.config.verbose
-                ):
-                    if not first:
-                        handle.write(",\n")
-                    handle.write(
-                        formatter.format_conversation(pipeline.filter(conversation))
-                    )
-                    first = False
-                handle.write("]")
-                return
-
+        if isinstance(formatter, JSONFormatter):
+            handle.write("[")
             first = True
-            for conversation in self.parser.iterate_conversations(
-                verbose=self.config.verbose
-            ):
+            for conversation in self._iter_filtered_conversations(pipeline):
                 if not first:
-                    handle.write("\n")
+                    handle.write(",\n")
                 handle.write(
-                    formatter.format_conversation(pipeline.filter(conversation))
+                    json.dumps(
+                        conversation,
+                        indent=formatter.indent,
+                        sort_keys=formatter.sort_keys,
+                        default=_json_default,
+                    )
                 )
                 first = False
+            handle.write("]")
+            return
+
+        first = True
+        for conversation in self._iter_filtered_conversations(pipeline):
+            if not first:
+                handle.write("\n")
+            handle.write(formatter.format_conversation(conversation))
+            first = False

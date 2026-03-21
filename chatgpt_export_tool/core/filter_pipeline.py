@@ -5,7 +5,8 @@ from typing import Any, Dict, List, Optional
 from .filter_models import FilterConfig
 from .field_selector import FieldSelector
 from .metadata_selector import MetadataSelector
-from .utils import get_logger
+from .logging_utils import get_logger
+from .metadata_validation import validate_metadata_patterns
 from .validators import ValidationResult, get_validator
 
 logger = get_logger()
@@ -62,6 +63,25 @@ class FilterPipeline:
         applied_filters = [f"fields={config.field_spec}"]
 
         if config.include_metadata or config.exclude_metadata:
+            metadata_validation = ValidationResult()
+            if config.include_metadata:
+                metadata_validation.merge(
+                    validate_metadata_patterns(config.include_metadata)
+                )
+            if config.exclude_metadata:
+                metadata_validation.merge(
+                    validate_metadata_patterns(config.exclude_metadata)
+                )
+            if not metadata_validation.is_valid and raise_on_invalid:
+                raise ValueError(
+                    f"Invalid metadata filters. Errors: {metadata_validation.errors}"
+                )
+            for warning in metadata_validation.warnings:
+                logger.warning(warning)
+            if validation is None:
+                validation = metadata_validation
+            else:
+                validation.merge(metadata_validation)
             metadata_selector = MetadataSelector.from_args(
                 include=config.include_metadata,
                 exclude=config.exclude_metadata,

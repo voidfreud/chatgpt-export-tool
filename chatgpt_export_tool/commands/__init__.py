@@ -4,7 +4,8 @@ import sys
 import traceback
 from abc import ABC, abstractmethod
 
-from chatgpt_export_tool.core.utils import get_logger, setup_logging, validate_file
+from chatgpt_export_tool.core.file_utils import validate_file
+from chatgpt_export_tool.core.logging_utils import get_logger, setup_logging
 
 
 class BaseCommand(ABC):

@@ -47,19 +47,11 @@ CATEGORY_FIELDS: Dict[str, List[str]] = {
 }
 
 
-# Metadata fields available in conversation message.metadata
-# These are the user-facing names that can be used with --include/--exclude
+# Metadata fields available in conversation message.metadata.
+# These are the user-facing names that can be used with --include/--exclude.
 METADATA_FIELDS: Dict[str, str] = {
-    "id": "Conversation ID",
-    "title": "Conversation title",
-    "create_time": "Creation timestamp",
-    "update_time": "Last update timestamp",
     "model_slug": "Model identifier",
     "message_type": "Message type indicator",
     "plugin_ids": "List of plugin IDs used",
-    "conversation_id": "Conversation UUID",
-    "type": "Conversation type",
-    "moderation_results": "Moderation check results",
-    "current_node": "Current node in conversation tree",
     "is_archived": "Archive status",
 }

@@ -7,7 +7,7 @@ import pytest
 
 from chatgpt_export_tool.cli import create_parser
 from chatgpt_export_tool.commands.analyze import AnalyzeCommand
-from chatgpt_export_tool.commands.export import ExportCommand
+from chatgpt_export_tool.commands.export import ExportCommand, export_command
 from chatgpt_export_tool.core.filter_pipeline import FilterConfig, FilterPipeline
 
 
@@ -102,6 +102,21 @@ class TestAnalyzeCliContract:
         assert "Analyzing structure" not in content
         assert "Using streaming JSON parsing" not in content
 
+    def test_analyze_output_creates_parent_directories(self, tmp_path: Path) -> None:
+        """Analyze should create missing parent directories for output files."""
+        source_file = _write_conversations_file(tmp_path / "conversations.json")
+        output_file = tmp_path / "nested" / "analysis.txt"
+
+        command = AnalyzeCommand(
+            filepath=str(source_file),
+            output_file=str(output_file),
+        )
+
+        exit_code = command.run()
+
+        assert exit_code == 0
+        assert output_file.exists()
+
 
 class TestExportCliContract:
     """Tests for the cleaned-up export CLI contract."""
@@ -146,6 +161,36 @@ class TestExportCliContract:
             ]
         )
         assert args.fields == "include title,create_time"
+
+    def test_export_rejects_output_dir_for_single_split(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Single split should reject split-directory output targets."""
+        parser = create_parser()
+        args = parser.parse_args(
+            ["export", "data.json", "--split", "single", "--output-dir", "exports"]
+        )
+
+        exit_code = export_command(args)
+
+        captured = capsys.readouterr()
+        assert exit_code == 2
+        assert "--output-dir can only be used" in captured.err
+
+    def test_export_rejects_output_file_for_split_modes(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Split modes should reject single-file output targets."""
+        parser = create_parser()
+        args = parser.parse_args(
+            ["export", "data.json", "--split", "subject", "--output", "out.txt"]
+        )
+
+        exit_code = export_command(args)
+
+        captured = capsys.readouterr()
+        assert exit_code == 2
+        assert "--output can only be used" in captured.err
 
 
 class TestFilteringContract:
@@ -213,6 +258,35 @@ class TestFilteringContract:
 
         assert metadata == {"model_slug": "gpt-4"}
 
+    def test_unknown_metadata_patterns_warn_without_stripping_structure(self) -> None:
+        """Unknown metadata patterns should warn but keep structural fields intact."""
+        pipeline = FilterPipeline.from_config(
+            FilterConfig(field_spec="all", include_metadata=["typo_pattern"])
+        )
+
+        conversation = {
+            "title": "Test",
+            "create_time": 1709337600.0,
+            "mapping": {
+                "node-1": {
+                    "message": {
+                        "metadata": {
+                            "model_slug": "gpt-4",
+                            "message_type": "next",
+                        }
+                    }
+                }
+            },
+        }
+
+        filtered = pipeline.filter(conversation)
+
+        assert filtered["title"] == "Test"
+        assert filtered["create_time"] == 1709337600.0
+        assert filtered["mapping"]["node-1"]["message"]["metadata"] == {}
+        assert pipeline.validation is not None
+        assert pipeline.validation.warnings
+
 
 class TestExportRuntimeContract:
     """Tests for single-file export behavior."""
@@ -229,7 +303,6 @@ class TestExportRuntimeContract:
         command = ExportCommand(
             filepath=str(source_file),
             split_mode="single",
-            output_dir=str(output_dir),
         )
 
         exit_code = command.run()
@@ -250,7 +323,6 @@ class TestExportRuntimeContract:
             filepath=str(source_file),
             split_mode="single",
             output_file=str(output_file),
-            output_dir=str(tmp_path / "unused-output-dir"),
         )
 
         exit_code = command.run()
