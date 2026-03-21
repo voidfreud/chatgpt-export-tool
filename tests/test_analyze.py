@@ -6,8 +6,9 @@ import pytest
 
 # Import from the new package structure
 from chatgpt_export_tool.cli import create_parser, main
-from chatgpt_export_tool.core.field_config import FieldSelector
-from chatgpt_export_tool.core.formatters import AnalyzeConfig, TextFormatter
+from chatgpt_export_tool.core.analysis_formatter import AnalyzeConfig
+from chatgpt_export_tool.core.conversation_formatters import TextFormatter
+from chatgpt_export_tool.core.field_selector import FieldSelector
 from chatgpt_export_tool.core.parser import JSONParser, format_size, get_file_size
 
 

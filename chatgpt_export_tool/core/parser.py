@@ -1,8 +1,4 @@
-"""
-JSON parsing module for ChatGPT conversations.
-
-Handles memory-efficient streaming parsing of large JSON files using ijson.
-"""
+"""Streaming JSON parsing for ChatGPT conversations."""
 
 from typing import Any, Dict
 
@@ -52,28 +48,24 @@ class JSONParser:
 
             for conv in conversations:
                 collector.add_conversation(conv)
-                results = collector.to_dict()
 
                 mapping = conv.get("mapping")
                 if isinstance(mapping, dict) and mapping:
                     logger.debug(
                         "Conversation %s: processing mapping with %s nodes",
-                        results["conversation_count"],
+                        collector.conversation_count,
                         len(mapping),
                     )
 
-                if (
-                    results["sample_conversation"]
-                    and results["conversation_count"] == 1
-                ):
+                if collector.sample_captured and collector.conversation_count == 1:
                     logger.debug(
                         "Storing sample conversation structure (conversation 1)"
                     )
 
-                if verbose and results["conversation_count"] % 100 == 0:
+                if verbose and collector.conversation_count % 100 == 0:
                     logger.debug(
                         "  Processed %s conversations...",
-                        results["conversation_count"],
+                        collector.conversation_count,
                     )
 
         results = collector.to_dict()

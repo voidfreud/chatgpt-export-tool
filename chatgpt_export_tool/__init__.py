@@ -1,9 +1,10 @@
-"""
-chatgpt_export_tool - A modular CLI tool for analyzing and exporting ChatGPT conversations.
+"""Top-level package metadata for chatgpt_export_tool."""
 
-This package provides commands for analyzing JSON structure and exporting
-conversation data from ChatGPT conversations.json export files.
-"""
+from importlib.metadata import PackageNotFoundError, version
 
-__version__ = "0.1"
-__author__ = "Developer"
+try:
+    __version__ = version("chatgpt-export-tool")
+except PackageNotFoundError:  # pragma: no cover - source tree fallback
+    __version__ = "unknown"
+
+__all__ = ["__version__"]

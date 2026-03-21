@@ -199,7 +199,7 @@ Supported formats:
 The current structure is intentionally modular:
 
 - CLI wiring lives in `chatgpt_export_tool/commands/`
-- streaming and analysis live in `parser.py`, `conversation_stream.py`, and `analysis_collector.py`
+- streaming and analysis live in `parser.py` and `analysis_collector.py`
 - field parsing and structural filtering live in `field_spec.py`, `field_rules.py`, `conversation_filter.py`, and `filter_pipeline.py`
 - metadata filtering lives in `metadata_selector.py`, `metadata_rules.py`, and `metadata_validation.py`
 - export orchestration lives in `export_service.py`

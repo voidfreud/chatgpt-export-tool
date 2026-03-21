@@ -3,6 +3,7 @@
 import argparse
 import sys
 
+from chatgpt_export_tool import __version__
 from chatgpt_export_tool.commands.analyze import add_analyze_parser, analyze_command
 from chatgpt_export_tool.commands.export import add_export_parser, export_command
 
@@ -42,7 +43,11 @@ See 'chatgpt-export analyze -h' or 'chatgpt-export export -h' for full details.
         """,
     )
 
-    parser.add_argument("--version", action="version", version="%(prog)s 0.1")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
     add_analyze_parser(subparsers)
     add_export_parser(subparsers)

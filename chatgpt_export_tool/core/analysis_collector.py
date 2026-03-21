@@ -50,6 +50,16 @@ class AnalysisCollector:
             results["sample_conversation"] = dict(self._results["sample_conversation"])
         return results
 
+    @property
+    def conversation_count(self) -> int:
+        """Return the number of collected conversations."""
+        return int(self._results["conversation_count"])
+
+    @property
+    def sample_captured(self) -> bool:
+        """Whether a sample conversation has already been stored."""
+        return self._results["sample_conversation"] is not None
+
     def _update_date_range(self, create_time: Any) -> None:
         """Update the min/max conversation timestamps.
 
