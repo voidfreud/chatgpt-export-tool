@@ -80,6 +80,11 @@ class TestAnalyzeCliContract:
         with pytest.raises(SystemExit):
             parser.parse_args(["analyze", "--field-selection", "all", "data.json"])
 
+        with pytest.raises(SystemExit):
+            parser.parse_args(
+                ["analyze", "--config", "chatgpt_export.toml", "data.json"]
+            )
+
     def test_verbose_analyze_output_file_keeps_report_clean(
         self, tmp_path: Path
     ) -> None:
@@ -191,6 +196,44 @@ class TestExportCliContract:
         captured = capsys.readouterr()
         assert exit_code == 2
         assert "--output can only be used" in captured.err
+
+    def test_export_accepts_config_argument(self) -> None:
+        """Export parser should expose TOML config loading."""
+        parser = create_parser()
+
+        args = parser.parse_args(
+            ["export", "data.json", "--config", "chatgpt_export.toml"]
+        )
+
+        assert args.config == "chatgpt_export.toml"
+
+    def test_export_direct_command_uses_explicit_config_defaults(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Direct Python construction should honor explicit config defaults too."""
+        source_file = _write_conversations_file(tmp_path / "conversations.json")
+        config_path = tmp_path / "chatgpt_export.toml"
+        config_path.write_text(
+            """
+[defaults]
+format = "json"
+split = "subject"
+fields = "groups minimal"
+output_dir = "exports"
+""".strip(),
+            encoding="utf-8",
+        )
+
+        command = ExportCommand(
+            filepath=str(source_file),
+            output_dir=str(tmp_path / "exports"),
+            config_path=str(config_path),
+        )
+
+        assert command.config.format_type == "json"
+        assert command.config.split_mode.value == "subject"
+        assert command.config.field_spec == "groups minimal"
 
 
 class TestFilteringContract:
@@ -350,6 +393,84 @@ class TestExportRuntimeContract:
         payload = json.loads(output_file.read_text(encoding="utf-8"))
         assert isinstance(payload, list)
         assert [conversation["title"] for conversation in payload] == ["Alpha", "Beta"]
+
+    def test_text_export_uses_configured_transcript_defaults(
+        self, tmp_path: Path
+    ) -> None:
+        """Transcript defaults should be read from TOML when no CLI override is given."""
+        source_file = tmp_path / "conversations.json"
+        source_file.write_text(
+            json.dumps(
+                [
+                    {
+                        "title": "Alpha",
+                        "id": "conv-1",
+                        "create_time": 1709337600.0,
+                        "current_node": "assistant-text",
+                        "mapping": {
+                            "root": {"parent": None, "message": None},
+                            "user": {
+                                "parent": "root",
+                                "message": {
+                                    "author": {"role": "user"},
+                                    "content": {
+                                        "content_type": "text",
+                                        "parts": ["question"],
+                                    },
+                                    "create_time": 1709337600.0,
+                                },
+                            },
+                            "assistant-code": {
+                                "parent": "user",
+                                "message": {
+                                    "author": {"role": "assistant"},
+                                    "content": {
+                                        "content_type": "code",
+                                        "parts": ["search(...)"],
+                                    },
+                                    "create_time": 1709337601.0,
+                                },
+                            },
+                            "assistant-text": {
+                                "parent": "assistant-code",
+                                "message": {
+                                    "author": {"role": "assistant"},
+                                    "content": {
+                                        "content_type": "text",
+                                        "parts": ["answer"],
+                                    },
+                                    "create_time": 1709337602.0,
+                                },
+                            },
+                        },
+                    }
+                ]
+            ),
+            encoding="utf-8",
+        )
+        config_path = tmp_path / "chatgpt_export.toml"
+        config_path.write_text(
+            """
+[transcript]
+show_assistant_code = true
+""".strip(),
+            encoding="utf-8",
+        )
+        output_file = tmp_path / "combined.txt"
+
+        command = ExportCommand(
+            filepath=str(source_file),
+            split_mode="single",
+            output_file=str(output_file),
+            config_path=str(config_path),
+        )
+
+        exit_code = command.run()
+
+        assert exit_code == 0
+        content = output_file.read_text(encoding="utf-8")
+        assert "search(...)" in content
+        assert "answer" in content
 
     def test_split_subject_naming_uses_stable_source_fields(
         self, tmp_path: Path

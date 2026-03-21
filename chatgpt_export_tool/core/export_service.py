@@ -15,6 +15,7 @@ from chatgpt_export_tool.core.conversation_formatters import (
 from chatgpt_export_tool.core.filter_pipeline import FilterConfig, FilterPipeline
 from chatgpt_export_tool.core.output_writer import OutputWriter, WriteJob, WriteResult
 from chatgpt_export_tool.core.parser import JSONParser
+from chatgpt_export_tool.core.runtime_config import TextOutputConfig, TranscriptConfig
 from chatgpt_export_tool.core.split_keys import resolve_group_key
 from chatgpt_export_tool.core.splitter import SplitMode
 from chatgpt_export_tool.core.logging_utils import get_logger
@@ -47,6 +48,8 @@ class ExportConfig:
     include_metadata: Optional[List[str]] = None
     exclude_metadata: Optional[List[str]] = None
     verbose: bool = False
+    transcript_config: TranscriptConfig = TranscriptConfig()
+    text_output_config: TextOutputConfig = TextOutputConfig()
 
 
 @dataclass
@@ -84,7 +87,11 @@ class ExportService:
         Returns:
             Structured export result.
         """
-        formatter = get_formatter(self.config.format_type)
+        formatter = get_formatter(
+            self.config.format_type,
+            transcript_config=self.config.transcript_config,
+            text_output_config=self.config.text_output_config,
+        )
         pipeline = self._build_pipeline()
 
         if self.config.split_mode == SplitMode.SINGLE:

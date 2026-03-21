@@ -1,0 +1,33 @@
+[defaults]
+format = "txt"
+split = "single"
+fields = "all"
+output_dir = "output"
+include_metadata = []
+exclude_metadata = []
+
+[transcript]
+follow_current_branch = true
+show_system_messages = false
+show_tool_messages = false
+show_user_text = true
+show_assistant_text = true
+show_assistant_thoughts = true
+show_user_editable_context = true
+show_multimodal_text = true
+show_assistant_code = false
+show_reasoning_recap = false
+skip_blank_messages = true
+honor_visual_hidden_flag = true
+include_turn_timestamps = true
+user_editable_context_mode = "compact"
+user_editable_context_preview_chars = 160
+show_visually_hidden_content_types = ["user_editable_context"]
+include_content_types = []
+exclude_content_types = []
+
+[text_output]
+include_header = true
+header_fields = ["title", "id", "create_time"]
+conversation_time_format = "%H:%M %d-%m-%Y"
+turn_time_format = "%H:%M %d-%m-%Y"

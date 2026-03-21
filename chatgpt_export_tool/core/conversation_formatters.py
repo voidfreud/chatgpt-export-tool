@@ -3,15 +3,15 @@
 import json
 from abc import ABC, abstractmethod
 from decimal import Decimal
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from chatgpt_export_tool.core.conversation_access import (
+    get_conversation_title,
     get_display_conversation_id,
-    get_message_role,
-    get_message_text,
-    iter_messages,
 )
-from chatgpt_export_tool.core.utils import get_logger
+from chatgpt_export_tool.core.runtime_config import TextOutputConfig, TranscriptConfig
+from chatgpt_export_tool.core.thread_transcript import iter_transcript_entries
+from chatgpt_export_tool.core.utils import format_timestamp, get_logger
 
 logger = get_logger()
 
@@ -34,18 +34,30 @@ class BaseFormatter(ABC):
 class TextFormatter(BaseFormatter):
     """Human-readable text formatter."""
 
-    def __init__(self, include_header: bool = True, indent: str = "  ") -> None:
+    def __init__(
+        self,
+        include_header: bool = True,
+        indent: str = "  ",
+        transcript_config: Optional[TranscriptConfig] = None,
+        text_output_config: Optional[TextOutputConfig] = None,
+    ) -> None:
         """Initialize a text formatter.
 
         Args:
             include_header: Whether to include headers in output.
             indent: Indentation string for nested dictionaries.
+            transcript_config: Transcript visibility policy.
+            text_output_config: Text output formatting policy.
         """
-        self.include_header = include_header
+        self.transcript_config = transcript_config or TranscriptConfig()
+        self.text_output_config = text_output_config or TextOutputConfig(
+            include_header=include_header
+        )
+        self.include_header = self.text_output_config.include_header
         self.indent = indent
         logger.debug(
             "Initialized TextFormatter with include_header=%s indent=%r",
-            include_header,
+            self.include_header,
             indent,
         )
 
@@ -58,24 +70,61 @@ class TextFormatter(BaseFormatter):
         Returns:
             Formatted conversation text.
         """
-        lines = [
-            "-" * 40,
-            f"Title: {conv.get('title', 'N/A')}",
-            f"ID: {get_display_conversation_id(conv)}",
-            f"Created: {conv.get('create_time', 'N/A')}",
-            "",
-        ]
+        lines = ["-" * 40]
 
-        mapping = conv.get("mapping")
-        if isinstance(mapping, dict) and mapping:
-            lines.append(f"Messages ({len(mapping)} nodes):")
-            for message in iter_messages(conv):
-                lines.append(
-                    f"  [{get_message_role(message)}] {get_message_text(message)}"
-                )
+        if self.include_header:
+            lines.extend(self._render_header(conv))
+            lines.append("")
+
+        for entry in iter_transcript_entries(conv, self.transcript_config):
+            prefix = ""
+            if (
+                self.transcript_config.include_turn_timestamps
+                and entry.timestamp is not None
+            ):
+                prefix = f"[{format_timestamp(entry.timestamp, self.text_output_config.turn_time_format)}] "
+            lines.append(f"{prefix}[{entry.role}] {entry.text}")
 
         lines.append("-" * 40)
         return "\n".join(lines)
+
+    def _render_header(self, conv: Dict[str, Any]) -> list[str]:
+        lines: list[str] = []
+        for field_name in self.text_output_config.header_fields:
+            value = self._get_header_value(conv, field_name)
+            if value is None:
+                continue
+            lines.append(f"{self._get_header_label(field_name)}: {value}")
+        return lines
+
+    def _get_header_label(self, field_name: str) -> str:
+        if field_name == "id":
+            return "ID"
+        if field_name == "create_time":
+            return "Created"
+        if field_name == "update_time":
+            return "Updated"
+        if field_name == "conversation_id":
+            return "Conversation ID"
+        return field_name.replace("_", " ").title()
+
+    def _get_header_value(self, conv: Dict[str, Any], field_name: str) -> Optional[str]:
+        if field_name == "title":
+            return get_conversation_title(conv)
+        if field_name == "id":
+            return get_display_conversation_id(conv)
+        value = conv.get(field_name)
+        if value is None:
+            return None
+        if field_name in {"create_time", "update_time"}:
+            try:
+                return format_timestamp(
+                    float(value),
+                    self.text_output_config.conversation_time_format,
+                )
+            except (TypeError, ValueError):
+                return str(value)
+        return str(value)
 
 
 class JSONFormatter(BaseFormatter):
@@ -131,6 +180,9 @@ def get_formatter(format_type: str, **kwargs: Any) -> BaseFormatter:
         raise ValueError(
             f"Unsupported format: {format_type}. Available: {list(FORMATTERS.keys())}"
         )
-    formatter = FORMATTERS[format_type](**kwargs)
+    formatter_kwargs = kwargs
+    if format_type == "json":
+        formatter_kwargs = {}
+    formatter = FORMATTERS[format_type](**formatter_kwargs)
     logger.debug("Created formatter %s", type(formatter).__name__)
     return formatter

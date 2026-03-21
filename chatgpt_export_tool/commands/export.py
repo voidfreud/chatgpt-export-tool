@@ -7,6 +7,7 @@ from typing import Optional
 from chatgpt_export_tool.commands import BaseCommand
 from chatgpt_export_tool.commands.options import add_logging_arguments
 from chatgpt_export_tool.core.export_service import ExportConfig, ExportService
+from chatgpt_export_tool.core.runtime_config import load_runtime_config
 from chatgpt_export_tool.core.splitter import SplitMode
 
 
@@ -16,13 +17,14 @@ class ExportCommand(BaseCommand):
     def __init__(
         self,
         filepath: str,
-        format_type: str = "txt",
+        format_type: Optional[str] = None,
         output_file: Optional[str] = None,
         output_dir: Optional[str] = None,
-        split_mode: str = "single",
-        fields: str = "all",
+        split_mode: Optional[str] = None,
+        fields: Optional[str] = None,
         include: Optional[list[str]] = None,
         exclude: Optional[list[str]] = None,
+        config_path: Optional[str] = None,
         verbose: bool = False,
         debug: bool = False,
     ) -> None:
@@ -37,25 +39,35 @@ class ExportCommand(BaseCommand):
             fields: Field selection specification.
             include: Metadata include patterns.
             exclude: Metadata exclude patterns.
+            config_path: Optional TOML config path.
             verbose: Whether INFO logging is enabled.
             debug: Whether DEBUG logging is enabled.
         """
         super().__init__(filepath=filepath, verbose=verbose, debug=debug)
+        runtime_config = load_runtime_config(config_path)
+        resolved_format = format_type or runtime_config.defaults.format_type
+        resolved_output_dir = output_dir or runtime_config.defaults.output_dir
+        resolved_split_mode = split_mode or runtime_config.defaults.split_mode
+        resolved_fields = fields or runtime_config.defaults.field_spec
+        resolved_include = include or list(runtime_config.defaults.include_metadata)
+        resolved_exclude = exclude or list(runtime_config.defaults.exclude_metadata)
         self._validate_output_targets(
-            split_mode=split_mode,
+            split_mode=resolved_split_mode,
             output_file=output_file,
             output_dir=output_dir,
         )
         self.config = ExportConfig(
             filepath=filepath,
-            format_type=format_type,
+            format_type=resolved_format,
             output_file=output_file,
-            output_dir=output_dir or "output",
-            split_mode=SplitMode(split_mode),
-            field_spec=fields,
-            include_metadata=include,
-            exclude_metadata=exclude,
+            output_dir=resolved_output_dir,
+            split_mode=SplitMode(resolved_split_mode),
+            field_spec=resolved_fields,
+            include_metadata=resolved_include,
+            exclude_metadata=resolved_exclude,
             verbose=self.logger.level <= 20,
+            transcript_config=runtime_config.transcript,
+            text_output_config=runtime_config.text_output,
         )
 
     @staticmethod
@@ -112,10 +124,11 @@ def export_command(args: argparse.Namespace) -> int:
             format_type=args.format,
             output_file=getattr(args, "output", None),
             output_dir=getattr(args, "output_dir", None),
-            split_mode=getattr(args, "split", "single"),
+            split_mode=getattr(args, "split", None),
             fields=args.fields,
             include=getattr(args, "include", None),
             exclude=getattr(args, "exclude", None),
+            config_path=getattr(args, "config", None),
             verbose=args.verbose,
             debug=args.debug,
         )
@@ -167,6 +180,7 @@ Examples:
   chatgpt-export export data.json
   chatgpt-export export data.json --output conversations.txt
   chatgpt-export export data.json --format json --output conversations.json
+  chatgpt-export export data.json --config chatgpt_export.toml
   chatgpt-export export data.json --split subject --output-dir ./exports
   chatgpt-export export data.json --fields "groups minimal" --split subject
   chatgpt-export export data.json --fields "include title,mapping" --include "model*" --exclude plugin_ids
@@ -178,20 +192,25 @@ Examples:
         help="Path to the conversations.json file to export",
     )
     export_parser.add_argument(
+        "--config",
+        metavar="PATH",
+        help="Load defaults from TOML config file",
+    )
+    export_parser.add_argument(
         "--format",
         "-F",
         choices=["txt", "json"],
-        default="txt",
-        help="Output format: 'txt' (default) or 'json'",
+        default=None,
+        help="Output format: 'txt' or 'json' (default from config or built-in fallback)",
     )
     export_parser.add_argument(
         "--fields",
         "-f",
-        default="all",
+        default=None,
         help=(
-            "Field selection: 'all' (default), 'none', "
+            "Field selection: 'all', 'none', "
             "'include field1,field2', 'exclude field1,field2', "
-            "'groups group1,group2'"
+            "'groups group1,group2' (default from config or built-in fallback)"
         ),
     )
     export_parser.add_argument(
@@ -210,10 +229,11 @@ Examples:
         "--split",
         "-s",
         choices=[mode.value for mode in SplitMode],
-        default="single",
+        default=None,
         help=(
-            "Split mode: 'single' (default), 'subject' (one file per conversation), "
-            "'date' (daily folders), 'id' (by conversation ID)"
+            "Split mode: 'single', 'subject' (one file per conversation), "
+            "'date' (daily folders), 'id' (by conversation ID); "
+            "default from config or built-in fallback"
         ),
     )
 

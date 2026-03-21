@@ -19,6 +19,8 @@ conversation
 
 The field selector can retain or remove fields across those levels while preserving the containers needed to reach nested selected fields.
 
+Text export is transcript-oriented: it follows the active branch defined by `current_node` and `parent` links, then applies transcript visibility rules from the TOML config passed to `export`.
+
 ## `--fields`
 
 The `--fields` argument accepts one field-selection spec.
@@ -215,6 +217,10 @@ chatgpt-export export data.json --split subject --output-dir exports --fields "g
 ## Notes
 
 - `analyze --fields` reports field coverage; it does not accept the export-style field-selection spec.
+- `export` can load defaults from a TOML file via `--config PATH`.
 - `export --split single` writes to stdout unless `--output` is provided.
 - Subject split files are named from the source conversation title plus identifier.
 - Split modes such as `subject`, `date`, and `id` write to `--output-dir`.
+- Text export follows the active conversation branch and is configurable through the `[transcript]` and `[text_output]` TOML sections.
+- Default text export shows user text, assistant text, assistant thoughts, and a compact preview of `user_editable_context`.
+- Default text export hides assistant code, reasoning recap, and tool plumbing unless the transcript policy explicitly enables them.

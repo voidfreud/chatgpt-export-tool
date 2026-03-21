@@ -3,6 +3,14 @@
 from datetime import datetime
 from typing import Any, Dict, Iterator, Optional
 
+from .thread_transcript import (
+    extract_message_text,
+    get_message_content_type,
+    get_message_create_time as get_message_create_time,
+    get_message_role as get_message_role,
+    iter_branch_messages,
+)
+
 
 def get_conversation_title(conversation: Dict[str, Any]) -> str:
     """Return a safe conversation title.
@@ -128,19 +136,30 @@ def iter_messages(conversation: Dict[str, Any]) -> Iterator[Dict[str, Any]]:
             yield message
 
 
-def get_message_role(message: Dict[str, Any]) -> str:
-    """Return a message author's role.
+def iter_renderable_messages(conversation: Dict[str, Any]) -> Iterator[Dict[str, Any]]:
+    """Yield only messages with readable text content.
 
     Args:
-        message: Message dictionary.
+        conversation: Conversation dictionary.
 
-    Returns:
-        Message role or ``unknown``.
+    Yields:
+        Message dictionaries whose rendered text is non-empty.
     """
-    author = message.get("author")
-    if isinstance(author, dict):
-        return str(author.get("role", "unknown"))
-    return "unknown"
+    for message in iter_messages(conversation):
+        if get_message_text(message).strip():
+            yield message
+
+
+def iter_thread_messages(conversation: Dict[str, Any]) -> Iterator[Dict[str, Any]]:
+    """Yield readable messages from the active conversation branch in order.
+
+    Args:
+        conversation: Conversation dictionary.
+
+    Yields:
+        Message dictionaries from the current branch, oldest to newest.
+    """
+    yield from iter_branch_messages(conversation, follow_current=True)
 
 
 def get_message_text(message: Dict[str, Any]) -> str:
@@ -152,11 +171,23 @@ def get_message_text(message: Dict[str, Any]) -> str:
     Returns:
         Joined content text.
     """
-    content = message.get("content")
-    if not isinstance(content, dict):
-        return "" if content is None else str(content)
+    return extract_message_text(message)
 
-    parts = content.get("parts", [])
-    if not isinstance(parts, list):
-        return str(parts)
-    return "\n".join(str(part) for part in parts)
+
+__all__ = [
+    "extract_message_text",
+    "get_conversation_title",
+    "get_date_group_key",
+    "get_display_conversation_id",
+    "get_id_group_key",
+    "get_message_content_type",
+    "get_message_create_time",
+    "get_message_role",
+    "get_message_text",
+    "get_subject_filename_stem",
+    "get_subject_group_key",
+    "iter_mapping_nodes",
+    "iter_messages",
+    "iter_renderable_messages",
+    "iter_thread_messages",
+]

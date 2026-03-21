@@ -25,15 +25,15 @@ def format_size(size_bytes: int) -> str:
     return f"{size:.2f} TB"
 
 
-def format_timestamp(timestamp: float) -> str:
+def format_timestamp(timestamp: float, time_format: str = "%H:%M %d-%m-%Y") -> str:
     """Format a Unix timestamp to human-readable date string.
 
     Args:
         timestamp: Unix timestamp (seconds since epoch). May be float, int, or Decimal.
 
     Returns:
-        Formatted string in "hh:mm dd-mm-yyyy" format.
+        Formatted date string.
     """
     # Handle Decimal values from JSON parser
     dt = datetime.fromtimestamp(float(timestamp))
-    return dt.strftime("%H:%M %d-%m-%Y")
+    return dt.strftime(time_format)

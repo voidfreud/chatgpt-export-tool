@@ -402,14 +402,13 @@ class TestTextFormatterTruncationFix:
             assert part in output, f"Content part '{part}' is missing from output"
 
     def test_format_conversation_empty_parts(self):
-        """A message with an empty parts list should produce empty text, not crash."""
+        """A message with empty parts should be skipped rather than rendered blank."""
         conv = self._make_conversation(parts=[])
 
         formatter = TextFormatter()
         output = formatter.format_conversation(conv)
 
-        # Should still produce valid output with the role but no text content
-        assert "[user]" in output, "Role label should still appear for empty parts"
+        assert "[user]" not in output
 
     def test_format_conversation_single_part_unchanged(self):
         """Regression: a single-part message should still work correctly."""
@@ -419,3 +418,77 @@ class TestTextFormatterTruncationFix:
         output = formatter.format_conversation(conv)
 
         assert "only part" in output
+
+    def test_format_conversation_skips_empty_message_nodes(self):
+        """Blank mapping nodes should not be rendered as empty chat turns."""
+        conv = {
+            "title": "Test",
+            "id": "conv-1",
+            "create_time": 1709337600.0,
+            "mapping": {
+                "node-1": {
+                    "message": {
+                        "author": {"role": "assistant"},
+                        "content": {"parts": []},
+                    }
+                },
+                "node-2": {
+                    "message": {
+                        "author": {"role": "user"},
+                        "content": {"parts": ["real text"]},
+                    }
+                },
+            },
+        }
+
+        formatter = TextFormatter()
+        output = formatter.format_conversation(conv)
+
+        assert "[user] real text" in output
+        assert "[assistant]" not in output
+        assert "Messages (" not in output
+
+    def test_format_conversation_uses_current_branch_and_timestamps(self):
+        """Text formatting should follow the active branch and include timestamps."""
+        conv = {
+            "title": "Test",
+            "id": "conv-1",
+            "create_time": 1709337600.0,
+            "current_node": "assistant-final",
+            "mapping": {
+                "root": {"parent": None, "message": None},
+                "user-1": {
+                    "parent": "root",
+                    "message": {
+                        "author": {"role": "user"},
+                        "content": {"parts": ["question"]},
+                        "create_time": 1709337600.0,
+                    },
+                },
+                "assistant-draft": {
+                    "parent": "user-1",
+                    "message": {
+                        "author": {"role": "assistant"},
+                        "content": {"parts": ["draft"]},
+                        "create_time": 1709337601.0,
+                    },
+                },
+                "assistant-final": {
+                    "parent": "user-1",
+                    "message": {
+                        "author": {"role": "assistant"},
+                        "content": {"parts": ["final answer"]},
+                        "create_time": 1709337602.0,
+                    },
+                },
+            },
+        }
+
+        formatter = TextFormatter()
+        output = formatter.format_conversation(conv)
+
+        assert "question" in output
+        assert "final answer" in output
+        assert "draft" not in output
+        assert "[user]" in output
+        assert "[assistant]" in output

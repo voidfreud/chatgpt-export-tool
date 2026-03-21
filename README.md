@@ -13,6 +13,8 @@ The project focuses on two things:
 
 It uses streaming JSON parsing with `ijson` and is organized around small core modules so filtering, formatting, split behavior, and path generation can be changed independently.
 
+Persistent defaults can be stored in a single TOML config file such as `chatgpt_export.toml`.
+
 ## Installation
 
 This project currently targets Python `3.10+`.
@@ -34,6 +36,8 @@ You can then run the CLI with:
 ```bash
 uv run chatgpt-export --help
 ```
+
+To apply config defaults, pass `--config PATH`.
 
 ## Quick Start
 
@@ -98,6 +102,7 @@ It supports:
 
 - structural field filtering through `--fields`
 - metadata filtering through `--include` and `--exclude`
+- transcript-oriented text export that follows the active branch
 - split modes for one output, one file per conversation, date folders, or ID-based files
 
 Examples:
@@ -109,6 +114,7 @@ uv run chatgpt-export export data.json --format json --output conversations.json
 uv run chatgpt-export export data.json --split subject --output-dir exports
 uv run chatgpt-export export data.json --fields "groups minimal" --split subject --output-dir exports
 uv run chatgpt-export export data.json --fields "include title,mapping" --include "model*" --exclude plugin_ids
+uv run chatgpt-export export data.json --config chatgpt_export.toml
 ```
 
 ## Field Filtering
@@ -183,8 +189,22 @@ Supported formats:
 - `txt`
 - `json`
 
-`txt` is a readable conversation-oriented export.
+`txt` is a transcript-oriented export that follows the active branch of the conversation tree.
 `json` writes the filtered conversation objects directly.
+
+By default, text export includes user text, assistant text, assistant thoughts, and user editable context when present. User editable context is rendered in a compact preview by default so transcripts stay readable. Text export hides tool plumbing, assistant code, reasoning recap, and blank/internal nodes unless the transcript policy is changed in config.
+
+## Configuration
+
+`export` accepts `--config PATH` and resolves defaults from one TOML file.
+
+The config file is TOML and is intentionally kept to one file with sections such as:
+
+- `[defaults]` for format, split mode, field selection, and output directory
+- `[transcript]` for active-branch reconstruction and visibility rules
+- `[text_output]` for header fields and date/time formats
+
+CLI arguments override TOML values. `analyze` does not currently use export config defaults.
 
 ## Architecture
 
@@ -219,4 +239,5 @@ uv run ruff format chatgpt_export_tool tests
 - Input handling is streaming, so large exports do not need to be loaded into memory just to analyze or iterate conversations.
 - Single-file JSON export writes one valid JSON document.
 - Split exports write one conversation per output file.
+- Text export follows the active thread path using `current_node` and `parent` links.
 - The field-selection and metadata-selection surface is documented in [Fields.md](Fields.md).
